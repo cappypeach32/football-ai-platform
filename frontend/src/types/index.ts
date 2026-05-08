@@ -107,6 +107,22 @@ export interface MatchAnalysis {
   referee: string | null;
 }
 
+export interface OddsSnapshot {
+  timestamp: string;
+  home: number;
+  draw: number;
+  away: number;
+}
+
+export interface OddsHistory {
+  match_id: number;
+  home_team: string;
+  away_team: string;
+  current: OddsSnapshot;
+  history: OddsSnapshot[];
+  movement: { home: "up" | "down" | "stable"; draw: "up" | "down" | "stable"; away: "up" | "down" | "stable" };
+}
+
 export interface BacktestSummary {
   total_predictions: number;
   correct_predictions: number;

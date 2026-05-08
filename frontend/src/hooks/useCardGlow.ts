@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
+import type { MouseEvent } from "react";
 
 /**
  * Returns event handlers that create a radial gradient glow
@@ -13,7 +14,7 @@ import { useRef, useCallback } from "react";
 export function useCardGlow(color = "0,255,135", intensity = 0.12) {
   const ref = useRef<HTMLDivElement>(null);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = useCallback((e: MouseEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();

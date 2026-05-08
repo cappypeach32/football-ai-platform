@@ -13,7 +13,10 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { cn } from "@/lib/utils";import { ConfidenceRing } from "@/components/ui/ConfidenceRing";
+import { cn } from "@/lib/utils";
+import { ConfidenceRing } from "@/components/ui/ConfidenceRing";
+import { MatchIntelligencePanel } from "@/components/predictions/MatchIntelligencePanel";
+import { OddsTracker } from "@/components/predictions/OddsTracker";
 // Charts are below-the-fold — lazy loaded to reduce initial bundle
 const TeamRadarChart = dynamic(
   () => import("@/components/analytics/TeamRadarChart").then((m) => ({ default: m.TeamRadarChart })),
@@ -346,22 +349,19 @@ export default function PredictionDetailPage({ params }: { params: { id: string 
         </div>
       </motion.div>
 
-      {/* AI Summary */}
-      {(p.ai_summary || p.key_factors?.length) && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card p-6">
-          <h2 className="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-            <Brain className="w-4 h-4 text-neon-purple" /> AI Analysis
-          </h2>
-          {p.ai_summary && <p className="text-sm text-foreground/80 leading-relaxed mb-4">{p.ai_summary}</p>}
-          {p.key_factors && p.key_factors.length > 0 && (
-            <ul className="space-y-2">
-              {p.key_factors.map((f, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
-                  <span className="text-neon-green mt-0.5 shrink-0">✓</span> {f}
-                </li>
-              ))}
-            </ul>
-          )}
+      {/* Match Intelligence Panel — AI summary + tactical breakdown + stats */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+        <MatchIntelligencePanel analysis={analysis} />
+      </motion.div>
+
+      {/* Odds Tracker */}
+      {(p.odds_home || p.odds_draw || p.odds_away) && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
+          <OddsTracker
+            predictionId={predId}
+            homeTeam={m.home_team.name}
+            awayTeam={m.away_team.name}
+          />
         </motion.div>
       )}
 

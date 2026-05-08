@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, MouseEvent } from "react";
 import { motion, useSpring, useTransform, useInView } from "framer-motion";
 import { TrendingUp, Target, Zap, BarChart2 } from "lucide-react";
 import { useValueFlash } from "@/hooks/useValueFlash";
@@ -64,7 +64,7 @@ function StatCard({ stat, index }: { stat: StatItem; index: number }) {
         const el = e.currentTarget;
         el.style.borderColor = stat.border;
         el.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px ${stat.border}, 0 0 28px ${stat.glow}`;
-        glow.handlers.onMouseMove(e as React.MouseEvent<HTMLDivElement>);
+        glow.handlers.onMouseMove(e as MouseEvent<HTMLDivElement>);
       }}
       onMouseMove={glow.handlers.onMouseMove}
       onMouseLeave={(e) => {
