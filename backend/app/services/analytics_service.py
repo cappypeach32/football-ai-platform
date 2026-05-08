@@ -1,0 +1,119 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, desc
+from app.models import Match, MatchStatus, Prediction, Team, League
+
+
+class AnalyticsService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_overview(self) -> dict:
+        total_matches = await self.db.scalar(select(func.count(Match.id))) or 0
+        total_preds = await self.db.scalar(select(func.count(Prediction.id))) or 0
+        correct = await self.db.scalar(
+            select(func.count(Prediction.id)).where(Prediction.is_correct == True)
+        ) or 0
+        accuracy = correct / total_preds if total_preds else 0
+
+        return {
+            "total_matches": total_matches,
+            "total_predictions": total_preds,
+            "overall_accuracy": round(accuracy, 4),
+            "value_bets_roi": 0.0,
+            "top_leagues": [],
+            "accuracy_by_market": {},
+            "recent_form": [],
+        }
+
+    async def get_league_stats(self) -> list[dict]:
+        result = await self.db.execute(
+            select(League.id, League.name, League.country, func.count(Match.id).label("match_count"))
+            .join(Match, Match.league_id == League.id, isouter=True)
+            .group_by(League.id)
+            .order_by(desc("match_count"))
+        )
+        return [{"id": r.id, "name": r.name, "country": r.country, "match_count": r.match_count} for r in result]
+
+    async def get_team_form(self, team_id: int, last_n: int = 10) -> list[dict]:
+        q = (
+            select(Match)
+            .where(
+                ((Match.home_team_id == team_id) | (Match.away_team_id == team_id)),
+                Match.status == MatchStatus.FINISHED,
+            )
+            .order_by(desc(Match.match_date))
+            .limit(last_n)
+        )
+        result = await self.db.execute(q)
+        matches = result.scalars().all()
+
+        form = []
+        for m in matches:
+            if m.home_team_id == team_id:
+                goals_for = m.home_score or 0
+                goals_against = m.away_score or 0
+                outcome = "W" if goals_for > goals_against else ("D" if goals_for == goals_against else "L")
+            else:
+                goals_for = m.away_score or 0
+                goals_against = m.home_score or 0
+                outcome = "W" if goals_for > goals_against else ("D" if goals_for == goals_against else "L")
+            form.append({
+                "match_id": m.id,
+                "date": m.match_date,
+                "goals_for": goals_for,
+                "goals_against": goals_against,
+                "outcome": outcome,
+            })
+        return form
+
+    async def get_team_radar(self, team_id: int) -> dict:
+        result = await self.db.execute(select(Team).where(Team.id == team_id))
+        team = result.scalar_one_or_none()
+        if not team:
+            return {}
+        return {
+            "attack": min(team.attack_strength * 50, 100),
+            "defense": max(100 - team.defense_weakness * 50, 0),
+            "form": team.form_score,
+            "elo": min((team.elo_rating - 1000) / 10, 100),
+            "home_advantage": team.home_advantage * 50,
+        }
+
+    async def get_head_to_head(self, home_id: int, away_id: int) -> dict:
+        q = (
+            select(Match)
+            .where(
+                ((Match.home_team_id == home_id) & (Match.away_team_id == away_id))
+                | ((Match.home_team_id == away_id) & (Match.away_team_id == home_id)),
+                Match.status == MatchStatus.FINISHED,
+            )
+            .order_by(desc(Match.match_date))
+            .limit(10)
+        )
+        result = await self.db.execute(q)
+        matches = result.scalars().all()
+
+        home_wins = draw = away_wins = 0
+        for m in matches:
+            hs = m.home_score or 0
+            as_ = m.away_score or 0
+            if hs > as_:
+                if m.home_team_id == home_id:
+                    home_wins += 1
+                else:
+                    away_wins += 1
+            elif hs == as_:
+                draw += 1
+            else:
+                if m.away_team_id == home_id:
+                    home_wins += 1
+                else:
+                    away_wins += 1
+
+        return {
+            "total": len(matches),
+            "home_wins": home_wins,
+            "draws": draw,
+            "away_wins": away_wins,
+            "matches": [{"id": m.id, "date": m.match_date, "score": f"{m.home_score}-{m.away_score}"} for m in matches],
+        }
