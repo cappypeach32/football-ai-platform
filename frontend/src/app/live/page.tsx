@@ -9,11 +9,12 @@ import { useEspnLive } from "@/hooks/useEspnLive";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { Match, EspnLiveMatch } from "@/types";
 import {
-  ChevronLeft, ChevronRight, Calendar, Wifi, WifiOff, Radio,
+  ChevronLeft, ChevronRight, Calendar, Wifi, WifiOff, Radio, Maximize2, Minimize2,
 } from "lucide-react";
 import { format, addDays, subDays, isToday } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useFocusMode } from "@/context/FocusModeContext";
 
 // Lazy-loaded: only fetched when user opens a drawer
 const PredictionDrawer = dynamic(
@@ -171,6 +172,7 @@ function MatchRow({ match }: { match: Match }) {
 export default function LivePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedMatch, setSelectedMatch] = useState<EspnLiveMatch | null>(null);
+  const { isFocused, toggle: toggleFocus } = useFocusMode();
 
   const dateParam = format(selectedDate, "yyyy-MM-dd");
   const isTodaySelected = isToday(selectedDate);
@@ -201,7 +203,7 @@ export default function LivePage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <div className={cn("space-y-6 transition-all duration-300", isFocused && "p-6")}>
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -244,9 +246,23 @@ export default function LivePage() {
             </div>
             <button
               onClick={() => refetch()}
-              className="px-4 py-2 rounded-lg bg-surface-card border border-surface-border text-sm text-muted-foreground hover:text-foreground hover:border-neon-green/30 transition-all"
+              className="px-3 py-1.5 rounded-lg bg-surface-card border border-surface-border text-sm text-muted-foreground hover:text-foreground hover:border-neon-green/30 transition-all"
             >
               Refresh
+            </button>
+            <button
+              onClick={toggleFocus}
+              className={cn(
+                "p-1.5 rounded-lg border transition-all duration-200",
+                isFocused
+                  ? "bg-neon-green/10 border-neon-green/30 text-neon-green"
+                  : "bg-surface-card border-surface-border text-muted-foreground hover:text-foreground hover:border-neon-green/30"
+              )}
+              title={isFocused ? "Exit Focus Mode" : "Focus Mode"}
+            >
+              {isFocused
+                ? <Minimize2 className="w-4 h-4" />
+                : <Maximize2 className="w-4 h-4" />}
             </button>
           </div>
         </motion.div>

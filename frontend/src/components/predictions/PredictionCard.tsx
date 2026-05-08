@@ -63,7 +63,7 @@ function KellyBar({ prediction: p }: { prediction: Prediction }) {
           style={{ boxShadow: `0 0 8px rgba(0,255,135,0.5)` }}
           initial={{ width: 0 }}
           animate={{ width: `${barWidth}%` }}
-          transition={{ duration: 0.9, delay: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+          transition={{ duration: 0.7, delay: 0.25, ease: [0.4, 0, 0.2, 1] }}
         />
       </div>
     </motion.div>
@@ -83,24 +83,22 @@ export function PredictionCard({ prediction: p, compact }: Props) {
       <motion.div
         ref={glow.ref}
         {...glow.handlers}
-        initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+        initial={{ opacity: 0, y: 12, filter: "blur(3px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        whileHover={{ y: -4, scale: 1.008 }}
-        whileTap={{ scale: 0.97 }}
-        transition={{ type: "spring", stiffness: 380, damping: 24, opacity: { duration: 0.35 }, filter: { duration: 0.35 } }}
+        whileHover={{ y: -2 }}
+        whileTap={{ scale: 0.98 }}
+        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1], opacity: { duration: 0.25 }, filter: { duration: 0.25 } }}
         className={cn(
           "match-card card-glow group",
           p.value_bet && "value-bet-card",
-          isHighConf && !p.value_bet && "border-neon-green/15"
+          isHighConf && !p.value_bet && "border-neon-green/10"
         )}
       >
         {/* Top accent line for high-confidence predictions */}
         {isHighConf && (
           <motion.div
-            className="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,135,0.7), transparent)" }}
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-0 left-0 right-0 h-px rounded-t-xl"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,135,0.5), transparent)", opacity: 0.8 }}
           />
         )}
 

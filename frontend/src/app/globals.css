@@ -97,6 +97,54 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-space), system-ui, sans-serif;
     letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  /* ─── Typography scale ─────────────────────────────────
+     Goal: clear hierarchy, no "everything is bold" syndrome
+  ─────────────────────────────────────────────────────── */
+  /* Page titles — used once per page */
+  .t-page-title {
+    font-size: 1.5rem;       /* 24px */
+    font-weight: 700;
+    font-family: var(--font-space), system-ui, sans-serif;
+    letter-spacing: -0.025em;
+    color: hsl(var(--foreground));
+    line-height: 1.15;
+  }
+  /* Section headings — card headers, group labels */
+  .t-section {
+    font-size: 0.9375rem;    /* 15px */
+    font-weight: 600;
+    font-family: var(--font-space), system-ui, sans-serif;
+    letter-spacing: -0.015em;
+    color: hsl(var(--foreground));
+  }
+  /* Card labels / sub-headings */
+  .t-label {
+    font-size: 0.75rem;      /* 12px */
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: hsl(var(--muted-foreground));
+    text-transform: none;
+  }
+  /* Data values — numbers, stats */
+  .t-data {
+    font-family: var(--font-jetbrains), monospace;
+    font-size: 0.875rem;     /* 14px */
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  /* Body text */
+  .t-body {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: hsl(var(--foreground) / 0.82);
+  }
+  /* Caption / helper text */
+  .t-caption {
+    font-size: 0.6875rem;    /* 11px */
+    color: hsl(var(--muted-foreground) / 0.75);
   }
 
   ::selection { background: rgba(0, 255, 135, 0.25); }
@@ -281,26 +329,26 @@
     will-change: transform;
   }
   .orb-1 {
-    width: 700px; height: 700px;
-    background: radial-gradient(circle, rgba(0,255,135,0.055) 0%, transparent 68%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,255,135,0.035) 0%, transparent 68%);
     top: -20%; right: -12%;
-    filter: blur(60px);
-    animation: orbDrift1 28s ease-in-out infinite;
+    filter: blur(70px);
+    animation: orbDrift1 36s ease-in-out infinite;
   }
   .orb-2 {
-    width: 550px; height: 550px;
-    background: radial-gradient(circle, rgba(0,212,255,0.045) 0%, transparent 68%);
+    width: 480px; height: 480px;
+    background: radial-gradient(circle, rgba(0,212,255,0.028) 0%, transparent 68%);
     bottom: -18%; left: -8%;
-    filter: blur(70px);
-    animation: orbDrift2 35s ease-in-out infinite;
+    filter: blur(80px);
+    animation: orbDrift2 44s ease-in-out infinite;
     animation-delay: -12s;
   }
   .orb-3 {
-    width: 420px; height: 420px;
-    background: radial-gradient(circle, rgba(139,92,246,0.04) 0%, transparent 68%);
+    width: 360px; height: 360px;
+    background: radial-gradient(circle, rgba(139,92,246,0.022) 0%, transparent 68%);
     top: 38%; left: 42%;
-    filter: blur(80px);
-    animation: orbDrift3 22s ease-in-out infinite;
+    filter: blur(90px);
+    animation: orbDrift3 28s ease-in-out infinite;
     animation-delay: -7s;
   }
 
@@ -318,19 +366,18 @@
   /* ─── Enhanced match card ────────────────────────────── */
   .match-card {
     @apply glass-card p-4 cursor-pointer;
-    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1),
-                border-color 0.25s ease,
-                box-shadow 0.25s ease;
+    transition: transform 0.22s ease,
+                border-color 0.22s ease,
+                box-shadow 0.22s ease;
   }
   .match-card:hover {
-    transform: translateY(-4px) scale(1.007);
-    border-color: rgba(0,255,135,0.3);
+    transform: translateY(-2px);
+    border-color: rgba(0,255,135,0.2);
     box-shadow:
-      0 16px 48px rgba(0,0,0,0.6),
-      0 0 0 1px rgba(0,255,135,0.15),
-      0 0 32px rgba(0,255,135,0.1),
-      inset 0 1px 0 rgba(255,255,255,0.07);
-    animation: borderGlow 2s ease-in-out infinite;
+      0 8px 28px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(0,255,135,0.1),
+      0 0 20px rgba(0,255,135,0.06),
+      inset 0 1px 0 rgba(255,255,255,0.06);
   }
 
   /* ─── Scan line (AI effect) ──────────────────────────── */
@@ -388,22 +435,22 @@
   /* ─── Ambient value-bet glow ──────────────────────────── */
   .value-bet-card {
     box-shadow:
-      0 0 0 1px rgba(0,255,135,0.18),
-      0 8px 32px rgba(0,0,0,0.5),
-      0 0 40px rgba(0,255,135,0.08),
+      0 0 0 1px rgba(0,255,135,0.14),
+      0 8px 28px rgba(0,0,0,0.45),
+      0 0 28px rgba(0,255,135,0.06),
       inset 0 1px 0 rgba(255,255,255,0.04);
   }
   .value-bet-card:hover {
     box-shadow:
-      0 0 0 1px rgba(0,255,135,0.35),
-      0 12px 40px rgba(0,0,0,0.6),
-      0 0 60px rgba(0,255,135,0.16),
-      inset 0 1px 0 rgba(255,255,255,0.06);
+      0 0 0 1px rgba(0,255,135,0.25),
+      0 12px 36px rgba(0,0,0,0.55),
+      0 0 40px rgba(0,255,135,0.1),
+      inset 0 1px 0 rgba(255,255,255,0.05);
   }
 
   /* ─── Cursor-reactive card glow (set via JS inline style) */
   .card-glow {
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
 
   /* ─── Mobile responsive polish ───────────────────────── */
