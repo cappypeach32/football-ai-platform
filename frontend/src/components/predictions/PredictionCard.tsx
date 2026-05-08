@@ -4,13 +4,69 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import type { Prediction } from "@/types";
 import { formatConfidence, formatProbability } from "@/lib/utils";
-import { Brain, Zap, Activity } from "lucide-react";
+import { Brain, Zap, Activity, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 interface Props {
   prediction: Prediction;
   compact?: boolean;
+}
+
+/** Kelly Criterion: f* = (b·p − q) / b, clamped [0, 0.5] */
+function computeKelly(prob: number, decimalOdds: number | null): number {
+  if (!decimalOdds || decimalOdds <= 1.01) return 0;
+  const b = decimalOdds - 1;
+  const f = (b * prob - (1 - prob)) / b;
+  return Math.max(0, Math.min(f, 0.5));
+}
+
+function KellyBar({ prediction: p }: { prediction: Prediction }) {
+  // Pick best positive kelly market
+  const candidates: { label: string; kelly: number; color: string }[] = [
+    { label: "Home", kelly: computeKelly(p.home_win_prob, p.odds_home), color: "bg-neon-green" },
+    { label: "Draw", kelly: computeKelly(p.draw_prob, p.odds_draw), color: "bg-neon-yellow" },
+    { label: "Away", kelly: computeKelly(p.away_win_prob, p.odds_away), color: "bg-neon-blue" },
+  ];
+
+  // Use recommended_bet preference if set
+  let best = candidates.filter((c) => c.kelly > 0).sort((a, b) => b.kelly - a.kelly)[0];
+  if (p.recommended_bet) {
+    const name = p.recommended_bet.toLowerCase();
+    const match = candidates.find((c) => c.label.toLowerCase() === name && c.kelly > 0);
+    if (match) best = match;
+  }
+
+  if (!best || best.kelly <= 0) return null;
+
+  const pct = best.kelly * 100;
+  const barWidth = Math.min(pct * 2, 100); // scale display: 50% kelly = full bar
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3, duration: 0.35 }}
+      className="mt-3 pt-3 border-t border-surface-border/50"
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <TrendingUp className="w-3 h-3 text-neon-green" />
+          Kelly Stake · {best.label}
+        </span>
+        <span className="text-[11px] font-mono font-bold text-neon-green">{pct.toFixed(1)}%</span>
+      </div>
+      <div className="w-full h-1.5 bg-surface-navy rounded-full overflow-hidden">
+        <motion.div
+          className={cn("h-full rounded-full", best.color)}
+          style={{ boxShadow: `0 0 8px rgba(0,255,135,0.5)` }}
+          initial={{ width: 0 }}
+          animate={{ width: `${barWidth}%` }}
+          transition={{ duration: 0.9, delay: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+        />
+      </div>
+    </motion.div>
+  );
 }
 
 export function PredictionCard({ prediction: p, compact }: Props) {
@@ -123,6 +179,9 @@ export function PredictionCard({ prediction: p, compact }: Props) {
             </p>
           </div>
         )}
+
+        {/* Kelly fraction bar – only for value bets with odds */}
+        {!compact && p.value_bet && <KellyBar prediction={p} />}
       </motion.div>
     </Link>
   );

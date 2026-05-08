@@ -37,7 +37,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-end justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-end justify-between relative">
+        {/* Gradient mesh behind title */}
+        <div className="absolute -inset-6 -z-10 pointer-events-none overflow-hidden">
+          <div
+            className="absolute inset-0"
+            style={{ background: "radial-gradient(ellipse 70% 120% at 15% 60%, rgba(0,255,135,0.10) 0%, rgba(0,212,255,0.06) 45%, transparent 72%)" }}
+          />
+        </div>
         <div className="space-y-0.5">
           <h1 className="text-2xl font-bold text-foreground">
             Dashboard <span className="gradient-text-green text-xl">— Intelligence Feed</span>

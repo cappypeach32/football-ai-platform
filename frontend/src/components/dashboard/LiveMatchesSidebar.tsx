@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { matchesApi, analyticsApi } from "@/lib/api";
 import type { Match } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar, Activity, AlertTriangle, TrendingUp, ChevronRight, Clock } from "lucide-react";
+import { Calendar, Activity, AlertTriangle, TrendingUp, ChevronRight, Clock, Radio } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -44,11 +44,7 @@ export function LiveMatchesSidebar() {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             {liveMatches.length > 0 ? (
-              <motion.span
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                className="w-2 h-2 rounded-full bg-red-500 inline-block"
-              />
+              <SonarPulse />
             ) : (
               <Activity className="w-3.5 h-3.5 text-neon-blue" />
             )}
@@ -152,16 +148,42 @@ export function LiveMatchesSidebar() {
   );
 }
 
+function SonarPulse() {
+  return (
+    <span className="relative inline-flex w-3 h-3 items-center justify-center">
+      <motion.span
+        animate={{ scale: [1, 2.8], opacity: [0.5, 0] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
+        className="absolute inset-0 rounded-full bg-red-500"
+      />
+      <motion.span
+        animate={{ scale: [1, 2.1], opacity: [0.35, 0] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut", delay: 0.4 }}
+        className="absolute inset-0 rounded-full bg-red-500"
+      />
+      <span className="relative w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
+    </span>
+  );
+}
+
 function Section({ label, children, pulse }: { label: string; children: React.ReactNode; pulse?: boolean }) {
   return (
     <div className="space-y-1.5">
       <p className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5">
         {pulse && (
-          <motion.span
-            animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"
-          />
+          <span className="relative inline-flex w-2 h-2">
+            <motion.span
+              animate={{ scale: [1, 2.4], opacity: [0.6, 0] }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
+              className="absolute inset-0 rounded-full bg-red-500"
+            />
+            <motion.span
+              animate={{ scale: [1, 1.8], opacity: [0.4, 0] }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut", delay: 0.3 }}
+              className="absolute inset-0 rounded-full bg-red-500"
+            />
+            <span className="relative w-2 h-2 rounded-full bg-red-500" />
+          </span>
         )}
         {label}
       </p>

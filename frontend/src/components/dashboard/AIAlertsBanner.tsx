@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Zap, X, AlertTriangle, Brain, TrendingUp, ChevronRight } from "lucide-react";
 import { analyticsApi } from "@/lib/api";
@@ -22,6 +22,38 @@ const TYPE_CONFIG = {
   injury: { icon: AlertTriangle, color: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/25" },
   model:  { icon: Brain,         color: "text-neon-purple", bg: "bg-neon-purple/10", border: "border-neon-purple/25" },
 };
+
+function TypewriterText({ text, speed = 18, delay = 300 }: { text: string; speed?: number; delay?: number }) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  const savedText = useRef(text);
+
+  useEffect(() => {
+    savedText.current = text;
+    setDisplayed("");
+    setDone(false);
+    let i = 0;
+    const timeout = setTimeout(() => {
+      const interval = setInterval(() => {
+        i++;
+        setDisplayed(savedText.current.slice(0, i));
+        if (i >= savedText.current.length) {
+          clearInterval(interval);
+          setDone(true);
+        }
+      }, speed);
+      return () => clearInterval(interval);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [text, speed, delay]);
+
+  return (
+    <span>
+      {displayed}
+      {!done && <span className="inline-block w-px h-3 bg-current opacity-80 animate-pulse ml-0.5 align-middle" />}
+    </span>
+  );
+}
 
 export function AIAlertsBanner() {
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -44,7 +76,7 @@ export function AIAlertsBanner() {
         <span className="text-[10px] bg-neon-green/20 text-neon-green px-1.5 py-0.5 rounded-full font-mono">{visible.length}</span>
       </div>
       <AnimatePresence>
-        {visible.map((alert) => {
+        {visible.map((alert, idx) => {
           const cfg = TYPE_CONFIG[alert.type];
           const Icon = cfg.icon;
           return (
@@ -61,7 +93,13 @@ export function AIAlertsBanner() {
               </div>
               <div className="flex-1 min-w-0">
                 <span className={`text-[10px] font-bold uppercase ${cfg.color} mr-2`}>{alert.title}</span>
-                <span className="text-xs text-foreground">{alert.text}</span>
+                <span className="text-xs text-foreground">
+                  {idx === 0 ? (
+                    <TypewriterText text={alert.text} delay={400} />
+                  ) : (
+                    alert.text
+                  )}
+                </span>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {alert.prediction_id && (

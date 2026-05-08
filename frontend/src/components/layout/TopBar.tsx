@@ -17,7 +17,9 @@ export function TopBar() {
   });
 
   return (
-    <header className="h-16 bg-surface-elevated border-b border-surface-border flex items-center justify-between px-6 gap-4 z-10">
+    <header className="h-16 bg-surface-elevated/60 backdrop-blur-xl border-b border-surface-border/50 flex items-center justify-between px-6 gap-4 z-20 relative">
+      {/* Subtle neon glow line along the bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-neon-green/25 to-transparent pointer-events-none" />
       {/* Search */}
       <div className="relative max-w-md w-full hidden md:flex items-center">
         <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
