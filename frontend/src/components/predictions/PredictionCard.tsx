@@ -20,9 +20,11 @@ export function PredictionCard({ prediction: p, compact }: Props) {
   return (
     <Link href={`/predictions/${p.id}`}>
       <motion.div
-        whileHover={{ y: -3, scale: 1.005 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        whileHover={{ y: -4, scale: 1.008 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 380, damping: 24, opacity: { duration: 0.35 }, filter: { duration: 0.35 } }}
         className={cn(
           "match-card group",
           isHighConf && "border-neon-green/15"
@@ -114,11 +116,12 @@ export function PredictionCard({ prediction: p, compact }: Props) {
 
         {/* AI summary excerpt */}
         {!compact && p.ai_summary && (
-          <p className="mt-3 text-xs text-muted-foreground line-clamp-2 border-t border-surface-border/60 pt-3
-                        group-hover:text-muted-foreground/80 transition-colors">
-            <Brain className="w-3 h-3 inline mr-1 text-neon-purple" />
-            {p.ai_summary}
-          </p>
+          <div className="scan-container mt-3 border-t border-surface-border/60 pt-3">
+            <p className="text-xs text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/80 transition-colors">
+              <Brain className="w-3 h-3 inline mr-1 text-neon-purple" />
+              {p.ai_summary}
+            </p>
+          </div>
         )}
       </motion.div>
     </Link>
