@@ -599,6 +599,8 @@ async def refresh_odds_for_upcoming(hours_ahead: int = 72) -> dict:
     cutoff = now + timedelta(hours=hours_ahead)
     summary = {"updated": 0, "skipped": 0, "errors": 0, "quota_remaining": None}
 
+    from sqlalchemy.orm import selectinload
+
     async with AsyncSessionLocal() as db:
         # Load all upcoming matches with predictions, grouped by league
         q = (
@@ -652,10 +654,41 @@ async def refresh_odds_for_upcoming(hours_ahead: int = 72) -> dict:
                     )
                     odds_lookup[key] = ev
 
+                def _normalize(name: str) -> str:
+                    """Normalize team name for fuzzy matching."""
+                    return (
+                        name.lower().strip()
+                        .replace("&", "and")
+                        .replace("afc ", "").replace(" afc", "")
+                        .replace("fc ", "").replace(" fc", "")
+                        .replace("  ", " ").strip()
+                    )
+
+                def _fuzzy_find(home_name: str, away_name: str) -> dict | None:
+                    """Find matching event by exact then normalized then token-overlap."""
+                    h = home_name.lower().strip()
+                    a = away_name.lower().strip()
+                    # 1. Exact
+                    if (h, a) in odds_lookup:
+                        return odds_lookup[(h, a)]
+                    # 2. Normalized (handles & vs and, AFC prefix, FC suffix)
+                    hn = _normalize(home_name)
+                    an = _normalize(away_name)
+                    for (ek_h, ek_a), ev in odds_lookup.items():
+                        if _normalize(ev.get("home_team", "")) == hn and _normalize(ev.get("away_team", "")) == an:
+                            return ev
+                    # 3. Significant token overlap (handles "Brighton & Hove" vs "Brighton and Hove Albion")
+                    h_tokens = set(hn.split()) - {"city", "united", "fc", "afc", "the"}
+                    a_tokens = set(an.split()) - {"city", "united", "fc", "afc", "the"}
+                    for (ek_h, ek_a), ev in odds_lookup.items():
+                        ev_h_tokens = set(_normalize(ev.get("home_team", "")).split()) - {"city", "united", "fc", "afc", "the"}
+                        ev_a_tokens = set(_normalize(ev.get("away_team", "")).split()) - {"city", "united", "fc", "afc", "the"}
+                        if h_tokens and a_tokens and h_tokens <= ev_h_tokens and a_tokens <= ev_a_tokens:
+                            return ev
+                    return None
+
                 for match in league_matches:
-                    home_lower = match.home_team.name.lower().strip()
-                    away_lower = match.away_team.name.lower().strip()
-                    ev_odds = odds_lookup.get((home_lower, away_lower))
+                    ev_odds = _fuzzy_find(match.home_team.name, match.away_team.name)
 
                     if not ev_odds or not ev_odds.get("home"):
                         summary["skipped"] += 1
