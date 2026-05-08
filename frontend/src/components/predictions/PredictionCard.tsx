@@ -7,6 +7,7 @@ import { formatConfidence, formatProbability } from "@/lib/utils";
 import { Brain, Zap, Activity, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { useCardGlow } from "@/hooks/useCardGlow";
 
 interface Props {
   prediction: Prediction;
@@ -72,18 +73,25 @@ function KellyBar({ prediction: p }: { prediction: Prediction }) {
 export function PredictionCard({ prediction: p, compact }: Props) {
   const { label: confLabel, className: confClass } = formatConfidence(p.confidence_score);
   const isHighConf = p.confidence_score >= 70;
+  const glow = useCardGlow(
+    p.value_bet ? "0,255,135" : "0,212,255",
+    p.value_bet ? 0.14 : 0.09
+  );
 
   return (
     <Link href={`/predictions/${p.id}`}>
       <motion.div
+        ref={glow.ref}
+        {...glow.handlers}
         initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         whileHover={{ y: -4, scale: 1.008 }}
         whileTap={{ scale: 0.97 }}
         transition={{ type: "spring", stiffness: 380, damping: 24, opacity: { duration: 0.35 }, filter: { duration: 0.35 } }}
         className={cn(
-          "match-card group",
-          isHighConf && "border-neon-green/15"
+          "match-card card-glow group",
+          p.value_bet && "value-bet-card",
+          isHighConf && !p.value_bet && "border-neon-green/15"
         )}
       >
         {/* Top accent line for high-confidence predictions */}

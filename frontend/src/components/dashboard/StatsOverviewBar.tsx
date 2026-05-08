@@ -1,8 +1,10 @@
 "use client";
 
+import React, { useRef, useEffect } from "react";
 import { motion, useSpring, useTransform, useInView } from "framer-motion";
-import { useRef, useEffect } from "react";
 import { TrendingUp, Target, Zap, BarChart2 } from "lucide-react";
+import { useValueFlash } from "@/hooks/useValueFlash";
+import { useCardGlow } from "@/hooks/useCardGlow";
 
 interface Props {
   overview: {
@@ -19,6 +21,7 @@ function AnimatedStat({ value, format }: { value: number; format: (v: number) =>
   const inView = useInView(ref, { once: true, margin: "-40px" });
   const spring = useSpring(0, { stiffness: 55, damping: 18, restDelta: 0.001 });
   const display = useTransform(spring, (v) => format(v));
+  const flashClass = useValueFlash(value);
 
   useEffect(() => {
     if (inView) spring.set(value);
@@ -27,11 +30,60 @@ function AnimatedStat({ value, format }: { value: number; format: (v: number) =>
   return (
     <motion.span
       ref={ref}
-      className="stat-number"
-      style={{ display: "inline-block" }}
+      className={`stat-number ${flashClass}`}
+      style={{ display: "inline-block", borderRadius: "4px", padding: "0 2px" }}
     >
       {display}
     </motion.span>
+  );
+}
+
+type StatItem = {
+  label: string;
+  value: number;
+  format: (v: number) => string;
+  icon: React.ElementType;
+  color: string;
+  border: string;
+  glow: string;
+  bg: string;
+};
+
+function StatCard({ stat, index }: { stat: StatItem; index: number }) {
+  const glow = useCardGlow("0,212,255", 0.09);
+  return (
+    <motion.div
+      ref={glow.ref}
+      initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ delay: index * 0.07, duration: 0.45, ease: "easeOut" }}
+      whileHover={{ y: -3, scale: 1.02 }}
+      className="glass-card card-glow p-4 flex items-center gap-3 group cursor-default"
+      style={{ transition: "border-color 0.25s, box-shadow 0.25s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget;
+        el.style.borderColor = stat.border;
+        el.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px ${stat.border}, 0 0 28px ${stat.glow}`;
+        glow.handlers.onMouseMove(e as React.MouseEvent<HTMLDivElement>);
+      }}
+      onMouseMove={glow.handlers.onMouseMove}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+        glow.handlers.onMouseLeave();
+      }}
+    >
+      <div className={`p-2.5 rounded-xl ${stat.bg} flex-shrink-0 transition-transform duration-300 group-hover:scale-110`}>
+        <stat.icon className={`w-5 h-5 ${stat.color}`} />
+      </div>
+      <div className="min-w-0">
+        <p className={`text-xl font-bold font-mono ${stat.color}`}>
+          <AnimatedStat value={stat.value} format={stat.format} />
+        </p>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">{stat.label}</p>
+      </div>
+    </motion.div>
   );
 }
 
@@ -89,37 +141,7 @@ export function StatsOverviewBar({ overview }: Props) {
       className="grid grid-cols-2 md:grid-cols-4 gap-3"
     >
       {stats.map((stat, i) => (
-        <motion.div
-          key={stat.label}
-          initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ delay: i * 0.07, duration: 0.45, ease: "easeOut" }}
-          whileHover={{ y: -3, scale: 1.02 }}
-          className="glass-card p-4 flex items-center gap-3 group cursor-default"
-          style={{
-            transition: "border-color 0.25s, box-shadow 0.25s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1)",
-          }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget;
-            el.style.borderColor = stat.border;
-            el.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px ${stat.border}, 0 0 28px ${stat.glow}`;
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget;
-            el.style.borderColor = "";
-            el.style.boxShadow = "";
-          }}
-        >
-          <div className={`p-2.5 rounded-xl ${stat.bg} flex-shrink-0 transition-transform duration-300 group-hover:scale-110`}>
-            <stat.icon className={`w-5 h-5 ${stat.color}`} />
-          </div>
-          <div className="min-w-0">
-            <p className={`text-xl font-bold font-mono ${stat.color}`}>
-              <AnimatedStat value={stat.value} format={stat.format} />
-            </p>
-            <p className="text-xs text-muted-foreground truncate mt-0.5">{stat.label}</p>
-          </div>
-        </motion.div>
+        <StatCard key={stat.label} stat={stat} index={i} />
       ))}
     </motion.div>
   );
