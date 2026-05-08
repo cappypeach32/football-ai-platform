@@ -97,36 +97,31 @@ export function PredictionFilters({ filters, onChange }: Props) {
 
       {/* League picker */}
       {leagues && leagues.length > 0 && (
-        <div className="flex items-center gap-2 w-full border-t border-surface-border pt-3 mt-1">
+        <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="text-xs text-muted-foreground flex-shrink-0">League:</span>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onChange({ ...filters, league_id: undefined, offset: 0 })}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs font-medium border transition-all",
-                filters.league_id === undefined
-                  ? "bg-neon-green/20 text-neon-green border-neon-green/30"
-                  : "bg-surface-elevated text-muted-foreground border-surface-border hover:text-foreground"
-              )}
-            >
-              All
-            </button>
+          <select
+            value={filters.league_id ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...filters,
+                league_id: e.target.value === "" ? undefined : Number(e.target.value),
+                offset: 0,
+              })
+            }
+            className={cn(
+              "px-3 py-1 rounded-lg text-xs font-medium border transition-all bg-surface-elevated border-surface-border text-foreground",
+              "focus:outline-none focus:border-neon-green/50 focus:ring-1 focus:ring-neon-green/20",
+              filters.league_id !== undefined && "border-neon-green/30 text-neon-green bg-neon-green/10"
+            )}
+          >
+            <option value="">All Leagues</option>
             {leagues.map((league) => (
-              <button
-                key={league.id}
-                onClick={() => onChange({ ...filters, league_id: league.id, offset: 0 })}
-                className={cn(
-                  "px-3 py-1 rounded-lg text-xs font-medium border transition-all",
-                  filters.league_id === league.id
-                    ? "bg-neon-green/20 text-neon-green border-neon-green/30"
-                    : "bg-surface-elevated text-muted-foreground border-surface-border hover:text-foreground"
-                )}
-              >
+              <option key={league.id} value={league.id}>
                 {league.name}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         </div>
       )}
     </motion.div>
