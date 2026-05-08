@@ -13,6 +13,7 @@ export default function PredictionsPage() {
   const [filters, setFilters] = useState({
     min_confidence: 0,
     value_bets_only: false,
+    upcoming_only: true,
     league_id: undefined as number | undefined,
     limit: 30,
     offset: 0,

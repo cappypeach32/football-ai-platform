@@ -22,12 +22,14 @@ async def list_predictions(
     league_id: int | None = Query(None),
     min_confidence: float = Query(0.0, ge=0, le=100),
     value_bets_only: bool = Query(False),
+    upcoming_only: bool = Query(True, description="Only return matches scheduled in the future"),
     team_name: str | None = Query(None, description="Filter by home or away team name (case-insensitive)"),
     limit: int = Query(20, le=100),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_db),
 ):
     from app.models import Team
+    from datetime import datetime
     home_alias = aliased(Team, name="home_t")
     away_alias = aliased(Team, name="away_t")
 
@@ -45,6 +47,8 @@ async def list_predictions(
         .limit(limit)
         .offset(offset)
     )
+    if upcoming_only:
+        q = q.where(Match.match_date >= datetime.utcnow())
     if league_id:
         q = q.where(Match.league_id == league_id)
     if value_bets_only:
@@ -55,14 +59,14 @@ async def list_predictions(
             home_alias.name.ilike(pattern),
             away_alias.name.ilike(pattern),
         ))
-        # Order by proximity to today (closest match first), then confidence
-        today_str = date.today().isoformat()
+        # Order by proximity to now (soonest first), then confidence
         q = q.order_by(
-            func.abs(func.julianday(Match.match_date) - func.julianday(today_str)),
+            Match.match_date,
             desc(Prediction.confidence_score),
         )
     else:
-        q = q.order_by(desc(Prediction.confidence_score))
+        # Soonest upcoming first, then by confidence within same-day matches
+        q = q.order_by(Match.match_date, desc(Prediction.confidence_score))
 
     result = await db.execute(q)
     return result.scalars().all()

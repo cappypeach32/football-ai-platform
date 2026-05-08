@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Filter, Zap } from "lucide-react";
+import { Filter, Zap, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Filters {
   min_confidence: number;
   value_bets_only: boolean;
+  upcoming_only: boolean;
   league_id?: number;
   limit: number;
   offset: number;
@@ -70,6 +71,20 @@ export function PredictionFilters({ filters, onChange }: Props) {
       >
         <Zap className="w-3 h-3" />
         Value Bets Only
+      </button>
+
+      {/* Upcoming only toggle */}
+      <button
+        onClick={() => onChange({ ...filters, upcoming_only: !filters.upcoming_only, offset: 0 })}
+        className={cn(
+          "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium border transition-all",
+          filters.upcoming_only
+            ? "bg-neon-blue/15 text-neon-blue border-neon-blue/30"
+            : "bg-surface-elevated text-muted-foreground border-surface-border hover:text-foreground"
+        )}
+      >
+        <Clock className="w-3 h-3" />
+        {filters.upcoming_only ? "Upcoming" : "All Matches"}
       </button>
     </motion.div>
   );
