@@ -21,8 +21,15 @@ class Prediction(Base):
     away_win_prob: Mapped[float] = mapped_column(Float)
     over_25_prob: Mapped[float] = mapped_column(Float)
     under_25_prob: Mapped[float] = mapped_column(Float)
+    over_15_prob: Mapped[float | None] = mapped_column(Float)
+    under_15_prob: Mapped[float | None] = mapped_column(Float)
+    over_35_prob: Mapped[float | None] = mapped_column(Float)
+    under_35_prob: Mapped[float | None] = mapped_column(Float)
     btts_yes_prob: Mapped[float] = mapped_column(Float)
     btts_no_prob: Mapped[float] = mapped_column(Float)
+    dc_1x_prob: Mapped[float | None] = mapped_column(Float)
+    dc_12_prob: Mapped[float | None] = mapped_column(Float)
+    dc_x2_prob: Mapped[float | None] = mapped_column(Float)
 
     home_xg: Mapped[float] = mapped_column(Float)
     away_xg: Mapped[float] = mapped_column(Float)
@@ -43,6 +50,7 @@ class Prediction(Base):
     result: Mapped[PredictionResult] = mapped_column(SAEnum(PredictionResult), default=PredictionResult.PENDING)
     is_correct: Mapped[bool | None] = mapped_column(Boolean)
     profit_loss: Mapped[float | None] = mapped_column(Float)
+    market_results: Mapped[dict | None] = mapped_column(JSON)
 
     model_version: Mapped[str] = mapped_column(String(50), default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

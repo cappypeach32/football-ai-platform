@@ -37,10 +37,24 @@ def _evaluate_bet(bet: str | None, home: int, away: int) -> bool | None:
         return total > 2
     if bet == "under_2.5":
         return total <= 2
+    if bet == "over_1.5":
+        return total > 1
+    if bet == "under_1.5":
+        return total <= 1
+    if bet == "over_3.5":
+        return total > 3
+    if bet == "under_3.5":
+        return total <= 3
     if bet == "btts_yes":
         return home > 0 and away > 0
     if bet == "btts_no":
         return not (home > 0 and away > 0)
+    if bet == "dc_1x":
+        return home >= away   # home win or draw
+    if bet == "dc_12":
+        return home != away   # home win or away win
+    if bet == "dc_x2":
+        return away >= home   # draw or away win
     return None
 
 
@@ -55,11 +69,35 @@ def _bet_prob(pred: Prediction, bet: str | None) -> float | None:
         return pred.over_25_prob
     if bet == "under_2.5":
         return pred.under_25_prob
+    if bet == "over_1.5":
+        return getattr(pred, "over_15_prob", None)
+    if bet == "under_1.5":
+        return getattr(pred, "under_15_prob", None)
+    if bet == "over_3.5":
+        return getattr(pred, "over_35_prob", None)
+    if bet == "under_3.5":
+        return getattr(pred, "under_35_prob", None)
     if bet == "btts_yes":
         return pred.btts_yes_prob
     if bet == "btts_no":
         return pred.btts_no_prob
+    if bet == "dc_1x":
+        return getattr(pred, "dc_1x_prob", None)
+    if bet == "dc_12":
+        return getattr(pred, "dc_12_prob", None)
+    if bet == "dc_x2":
+        return getattr(pred, "dc_x2_prob", None)
     return None
+
+
+_ALL_MARKETS = [
+    "1", "X", "2",
+    "dc_1x", "dc_12", "dc_x2",
+    "over_1.5", "under_1.5",
+    "over_2.5", "under_2.5",
+    "over_3.5", "under_3.5",
+    "btts_yes", "btts_no",
+]
 
 
 # ── Service ───────────────────────────────────────────────────────────────────
@@ -96,6 +134,15 @@ class BacktestService:
             pred.is_correct = is_correct
             pred.profit_loss = round((odds - 1) * UNIT_STAKE if is_correct else -UNIT_STAKE, 4)
             pred.result = PredictionResult.WIN if is_correct else PredictionResult.LOSS
+
+            # Evaluate all markets and store in market_results JSON
+            market_results: dict = {}
+            for market in _ALL_MARKETS:
+                correct = _evaluate_bet(market, match.home_score, match.away_score)
+                prob = _bet_prob(pred, market)
+                if correct is not None and prob is not None:
+                    market_results[market] = {"correct": correct, "prob": round(prob, 4)}
+            pred.market_results = market_results
 
             # Ensure match marked finished
             match.status = MatchStatus.FINISHED

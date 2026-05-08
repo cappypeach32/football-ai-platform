@@ -154,6 +154,8 @@ class PredictionEngine:
         p_hw, p_d, p_aw   = self._poisson.outcome_probs(matrix)
         p_over, p_under    = self._poisson.over_under_probs(matrix)
         p_btts, p_no_btts  = self._poisson.btts_probs(matrix)
+        p_over_15, _       = self._poisson.over_under_probs(matrix, line=1.5)
+        p_over_35, _       = self._poisson.over_under_probs(matrix, line=3.5)
 
         # ── 3. ELO adjustment ─────────────────────────────────────────────────
         elo_adj = self._elo_adjustment(home_team.elo_rating, away_team.elo_rating)
@@ -177,6 +179,8 @@ class PredictionEngine:
             # Recompute matrix with adjusted xG for BTTS / exact scores
             matrix = self._poisson.predict_score_matrix(home_xg, away_xg)
             p_btts, p_no_btts = self._poisson.btts_probs(matrix)
+            p_over_15, _ = self._poisson.over_under_probs(matrix, line=1.5)
+            p_over_35, _ = self._poisson.over_under_probs(matrix, line=3.5)
 
         # ── 6. Normalise final probs ──────────────────────────────────────────
         total = p_hw + p_d + p_aw
@@ -189,8 +193,18 @@ class PredictionEngine:
         confidence = self._confidence_score(p_hw, p_d, p_aw, home_team, away_team, features)
         risk = self._risk_score(confidence, features)
 
+        # ── 7b. DC probabilities (derived from final normalised 1X2) ─────────
+        p_dc_1x = p_hw + p_d
+        p_dc_12 = p_hw + p_aw
+        p_dc_x2 = p_d + p_aw
+
         # ── 8. Value bet detection ────────────────────────────────────────────
-        recommended, is_value = self._value_detection(p_hw, p_d, p_aw, match, confidence)
+        recommended, is_value = self._value_detection(
+            p_hw, p_d, p_aw, match, confidence,
+            over25=p_over, under25=p_under,
+            btts_yes=p_btts, btts_no=p_no_btts,
+            over15=p_over_15, over35=p_over_35,
+        )
 
         # ── 9. AI narrative ───────────────────────────────────────────────────
         summary, tactical, key_factors = self._generate_narrative(
@@ -206,8 +220,15 @@ class PredictionEngine:
             "away_win_prob":    round(p_aw, 4),
             "over_25_prob":     round(p_over, 4),
             "under_25_prob":    round(p_under, 4),
+            "over_15_prob":     round(p_over_15, 4),
+            "under_15_prob":    round(1.0 - p_over_15, 4),
+            "over_35_prob":     round(p_over_35, 4),
+            "under_35_prob":    round(1.0 - p_over_35, 4),
             "btts_yes_prob":    round(p_btts, 4),
             "btts_no_prob":     round(p_no_btts, 4),
+            "dc_1x_prob":       round(p_dc_1x, 4),
+            "dc_12_prob":       round(p_dc_12, 4),
+            "dc_x2_prob":       round(p_dc_x2, 4),
             "home_xg":          round(home_xg, 2),
             "away_xg":          round(away_xg, 2),
             "confidence_score": round(confidence, 1),
@@ -379,26 +400,41 @@ class PredictionEngine:
     # ── Value detection ───────────────────────────────────────────────────────
 
     def _value_detection(
-        self, hw: float, d: float, aw: float, match: Any, confidence: float = 50.0
+        self, hw: float, d: float, aw: float, match: Any, confidence: float = 50.0,
+        over25: float = 0.5, under25: float = 0.5,
+        btts_yes: float = 0.5, btts_no: float = 0.5,
+        over15: float = 0.5, over35: float = 0.5,
     ) -> tuple[str | None, bool]:
-        best_prob = max(hw, d, aw)
-        if best_prob == hw:
-            recommended, market_odds = "1", getattr(match, "odds_home", None)
-        elif best_prob == aw:
-            recommended, market_odds = "2", getattr(match, "odds_away", None)
+        # All candidate markets with their probabilities and corresponding odds attribute
+        candidates: list[tuple[str, float, str | None]] = [
+            ("1",          hw,       getattr(match, "odds_home",  None)),
+            ("X",          d,        getattr(match, "odds_draw",  None)),
+            ("2",          aw,       getattr(match, "odds_away",  None)),
+            ("over_2.5",   over25,   None),
+            ("under_2.5",  under25,  None),
+            ("btts_yes",   btts_yes, None),
+            ("btts_no",    btts_no,  None),
+            ("over_1.5",   over15,   None),
+            ("over_3.5",   over35,   None),
+        ]
+
+        # Pick 1X2 best as the primary recommended bet for display purposes
+        best_1x2_prob = max(hw, d, aw)
+        if best_1x2_prob == hw:
+            recommended, primary_odds = "1", getattr(match, "odds_home", None)
+        elif best_1x2_prob == aw:
+            recommended, primary_odds = "2", getattr(match, "odds_away", None)
         else:
-            recommended, market_odds = "X", getattr(match, "odds_draw", None)
+            recommended, primary_odds = "X", getattr(match, "odds_draw", None)
 
         is_value = False
-        if market_odds and best_prob > 0:
-            # Real odds available: check if model probability beats implied probability by ≥5%
-            implied = 1.0 / market_odds
-            if best_prob > implied * 1.05:
+        # Check primary recommendation for value
+        if primary_odds and best_1x2_prob > 0:
+            implied = 1.0 / primary_odds
+            if best_1x2_prob > implied * 1.05:
                 is_value = True
         else:
-            # No market odds: use model-based value detection
-            # Flag as value bet if best outcome prob >= 52% AND confidence >= 60
-            if best_prob >= 0.52 and confidence >= 60:
+            if best_1x2_prob >= 0.52 and confidence >= 60:
                 is_value = True
 
         return recommended, is_value

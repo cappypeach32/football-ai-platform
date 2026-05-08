@@ -28,5 +28,5 @@ class AnalyticsOverview(BaseModel):
     overall_roi: float = 0.0
     resolved_bets: int = 0
     top_leagues: list[dict[str, Any]]
-    accuracy_by_market: dict[str, float]
+    accuracy_by_market: dict[str, dict]
     recent_form: list[dict[str, Any]]

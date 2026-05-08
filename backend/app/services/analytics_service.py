@@ -36,6 +36,33 @@ class AnalyticsService:
         vb_count = vb_row[1] or 0
         vb_roi = round((vb_pl / vb_count) * 100, 2) if vb_count > 0 else roi  # fall back to overall ROI
 
+        # Per-market accuracy from market_results JSON
+        # Fetch all resolved predictions that have market_results populated
+        mr_result = await self.db.execute(
+            select(Prediction.market_results)
+            .where(Prediction.market_results.isnot(None))
+        )
+        per_market: dict[str, dict] = {}
+        for (market_data,) in mr_result:
+            if not isinstance(market_data, dict):
+                continue
+            for market, info in market_data.items():
+                if not isinstance(info, dict) or "correct" not in info:
+                    continue
+                if market not in per_market:
+                    per_market[market] = {"correct": 0, "total": 0}
+                per_market[market]["total"] += 1
+                if info["correct"]:
+                    per_market[market]["correct"] += 1
+        accuracy_by_market = {
+            m: {
+                "accuracy": round(v["correct"] / v["total"], 4) if v["total"] else 0.0,
+                "total": v["total"],
+                "correct": v["correct"],
+            }
+            for m, v in sorted(per_market.items())
+        }
+
         return {
             "total_matches": total_matches,
             "total_predictions": total_preds,
@@ -44,7 +71,7 @@ class AnalyticsService:
             "overall_roi": roi,
             "resolved_bets": resolved_bets,
             "top_leagues": [],
-            "accuracy_by_market": {},
+            "accuracy_by_market": accuracy_by_market,
             "recent_form": [],
         }
 

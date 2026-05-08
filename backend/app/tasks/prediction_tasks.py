@@ -47,8 +47,13 @@ async def _refresh_predictions():
             try:
                 pred_data = await engine.predict(match)
                 _PRED_FIELDS = {
-                    "home_win_prob", "draw_prob", "away_win_prob", "over_25_prob", "under_25_prob",
-                    "btts_yes_prob", "btts_no_prob", "home_xg", "away_xg", "confidence_score",
+                    "home_win_prob", "draw_prob", "away_win_prob",
+                    "over_25_prob", "under_25_prob",
+                    "over_15_prob", "under_15_prob",
+                    "over_35_prob", "under_35_prob",
+                    "btts_yes_prob", "btts_no_prob",
+                    "dc_1x_prob", "dc_12_prob", "dc_x2_prob",
+                    "home_xg", "away_xg", "confidence_score",
                     "risk_score", "value_bet", "recommended_bet", "ai_summary", "tactical_notes",
                     "key_factors", "odds_home", "odds_draw", "odds_away", "model_version",
                 }
