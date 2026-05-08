@@ -373,7 +373,8 @@ async def get_team_injuries(team_external_id: str, team_name: str = "", league_s
                 position=item.get("position"),
                 status=item.get("status", "Injured"),
                 detail=item.get("news"),
-                photo_url=item.get("photo") or None,
+                photo_url=None,  # FPL photo CDN blocks server-side requests (403)
+                chance_of_playing=item.get("chance_of_playing"),
             )
             for item in raw
         ]
@@ -521,3 +522,50 @@ async def get_schedule_congestion(team_external_id: str, db: AsyncSession) -> fl
     if last_date.tzinfo is None:
         last_date = last_date.replace(tzinfo=timezone.utc)
     return max(1.0, (now - last_date).total_seconds() / 86400)
+
+
+# ── ESPN odds refresh ─────────────────────────────────────────────────────────
+
+async def refresh_match_odds(match: Match, league_slug: str, db: AsyncSession) -> bool:
+    """
+    Fetch 1X2 odds from ESPN pickcenter and persist them on the match's Prediction.
+
+    Returns True if odds were updated, False otherwise.
+    Caches result for 30 minutes (odds don't change that often pre-match).
+    """
+    from app.models import Prediction
+
+    if not match.external_id:
+        return False
+
+    cache_key = f"odds:espn:{match.external_id}"
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        odds = cached
+    else:
+        odds = await espn.fetch_match_odds(match.external_id, league_slug)
+        if any(v is not None for v in odds.values()):
+            await cache.set(cache_key, odds, ttl=1800)  # 30 min
+
+    if not any(v is not None for v in odds.values()):
+        return False
+
+    result = await db.execute(
+        select(Prediction).where(Prediction.match_id == match.id)
+    )
+    pred = result.scalar_one_or_none()
+    if not pred:
+        return False
+
+    updated = False
+    for field_name, key in (("odds_home", "home"), ("odds_draw", "draw"), ("odds_away", "away")):
+        val = odds.get(key)
+        if val is not None and getattr(pred, field_name) != val:
+            setattr(pred, field_name, val)
+            updated = True
+
+    if updated:
+        await db.commit()
+        logger.info("odds_refreshed", match_id=match.id, odds=odds)
+
+    return updated

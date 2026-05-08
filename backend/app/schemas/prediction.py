@@ -11,6 +11,7 @@ class InjuredPlayerInfo(BaseModel):
     detail: str | None = None
     return_date: str | None = None
     photo_url: str | None = None
+    chance_of_playing: int | None = None  # 0-100 from FPL
 
 
 class H2HResult(BaseModel):

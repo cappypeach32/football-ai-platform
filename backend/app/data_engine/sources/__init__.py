@@ -258,6 +258,58 @@ class ESPNSource:
         except Exception:
             return []
 
+    # ── Odds (pickcenter from match summary) ──────────────────────────────────
+
+    async def fetch_match_odds(
+        self, event_id: str, league_slug: str
+    ) -> dict[str, float | None]:
+        """
+        Fetch 1X2 + over/under odds for a match from ESPN pickcenter (DraftKings).
+
+        Returns decimal odds dict:
+            {home, draw, away, over_25, under_25}
+        All values may be None if odds aren't available yet.
+
+        Moneyline conversion: +ML  → (ML/100) + 1
+                              -ML  → (100/|ML|) + 1
+        """
+        data = await self.fetch_event_summary(event_id, league_slug)
+        if not data:
+            return {"home": None, "draw": None, "away": None, "over_25": None, "under_25": None}
+
+        picks = data.get("pickcenter", [])
+        if not picks:
+            return {"home": None, "draw": None, "away": None, "over_25": None, "under_25": None}
+
+        # Use first provider (DraftKings is priority 1)
+        p = picks[0]
+
+        def ml_to_decimal(ml: float | None) -> float | None:
+            if ml is None:
+                return None
+            try:
+                ml = float(ml)
+                if ml > 0:
+                    return round(ml / 100 + 1, 3)
+                else:
+                    return round(100 / abs(ml) + 1, 3)
+            except (TypeError, ZeroDivisionError):
+                return None
+
+        home_ml = (p.get("homeTeamOdds") or {}).get("moneyLine")
+        away_ml = (p.get("awayTeamOdds") or {}).get("moneyLine")
+        draw_ml = (p.get("drawOdds") or {}).get("moneyLine")
+        over_odds  = p.get("overOdds")
+        under_odds = p.get("underOdds")
+
+        return {
+            "home":     ml_to_decimal(home_ml),
+            "draw":     ml_to_decimal(draw_ml),
+            "away":     ml_to_decimal(away_ml),
+            "over_25":  ml_to_decimal(over_odds),
+            "under_25": ml_to_decimal(under_odds),
+        }
+
 
 # ── Module-level singleton ────────────────────────────────────────────────────
 # For use in FastAPI route handlers (which manage their own event loops).

@@ -69,6 +69,7 @@ export interface InjuredPlayerInfo {
   detail: string | null;
   return_date: string | null;
   photo_url: string | null;
+  chance_of_playing: number | null;
 }
 
 export interface H2HResult {

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, or_, func, case
 from sqlalchemy.orm import selectinload, aliased
@@ -11,7 +11,7 @@ from app.dependencies import get_current_user, require_premium
 from app.models import User
 from app.ai.engine import PredictionEngine
 from app.ai.analysis_engine import generate_pre_match_analysis
-from app.data_engine.pipeline import get_team_form, get_team_injuries, get_h2h
+from app.data_engine.pipeline import get_team_form, get_team_injuries, get_h2h, refresh_match_odds
 
 router = APIRouter()
 _engine = PredictionEngine()
@@ -121,6 +121,7 @@ async def get_prediction(
 @router.get("/{prediction_id}/analysis", response_model=MatchAnalysisResponse)
 async def get_match_analysis(
     prediction_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """Full match analysis: prediction + injuries + form + H2H (all cached)."""
@@ -152,6 +153,9 @@ async def get_match_analysis(
         get_team_form(away_team.external_id or "", league_slug, away_team.name),
         get_h2h(home_team.external_id or "", away_team.external_id or "", league_slug, home_team.name, away_team.name),
     )
+
+    # Refresh odds from ESPN pickcenter in background (non-blocking)
+    background_tasks.add_task(refresh_match_odds, match, league_slug, db)
 
     def _avg(form, for_: bool) -> float:
         vals = [e.goals_for if for_ else e.goals_against for e in form]
