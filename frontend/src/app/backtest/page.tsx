@@ -8,6 +8,7 @@ import { BacktestSummaryCards } from "@/components/backtest/BacktestSummaryCards
 import { HistoricalPredictionsTable } from "@/components/backtest/HistoricalPredictionsTable";
 import { AccuracyChart } from "@/components/backtest/AccuracyChart";
 import { CalibrationChart } from "@/components/backtest/CalibrationChart";
+import { EquityCurveChart } from "@/components/backtest/EquityCurveChart";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 const MARKETS = [
@@ -211,6 +212,9 @@ export default function BacktestPage() {
             <AccuracyChart data={summary.monthly_performance} />
             <CalibrationChart data={calibration ?? []} />
           </div>
+
+          {/* Equity curve */}
+          <EquityCurveChart data={summary.monthly_performance} />
 
           {/* Confidence tier + By Market */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

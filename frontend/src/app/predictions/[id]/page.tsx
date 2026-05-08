@@ -16,6 +16,10 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 
 // Charts are below-the-fold — lazy loaded to reduce initial bundle
+const TeamRadarChart = dynamic(
+  () => import("@/components/analytics/TeamRadarChart").then((m) => ({ default: m.TeamRadarChart })),
+  { ssr: false, loading: () => <div className="h-72 rounded-xl bg-surface-elevated animate-pulse" /> }
+);
 const WinProbabilityGauge = dynamic(
   () => import("@/components/charts/WinProbabilityGauge").then((m) => ({ default: m.WinProbabilityGauge })),
   { ssr: false, loading: () => <div className="h-40 rounded-xl bg-surface-elevated animate-pulse" /> }
@@ -408,6 +412,28 @@ export default function PredictionDetailPage({ params }: { params: { id: string 
             </div>
           </div>
         </div>
+      </motion.div>
+
+      {/* Dual-team Radar */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
+        <TeamRadarChart
+          home={{
+            attack:        m.home_team.attack_strength,
+            defense:       Math.max(0, 1 - m.home_team.defense_weakness),
+            form:          Math.max(0, Math.min(1, m.home_team.form_score)),
+            elo:           Math.max(0, Math.min(1, (m.home_team.elo_rating - 1000) / 1000)),
+            home_advantage: 0.65,
+          }}
+          away={{
+            attack:        m.away_team.attack_strength,
+            defense:       Math.max(0, 1 - m.away_team.defense_weakness),
+            form:          Math.max(0, Math.min(1, m.away_team.form_score)),
+            elo:           Math.max(0, Math.min(1, (m.away_team.elo_rating - 1000) / 1000)),
+            home_advantage: 0.35,
+          }}
+          homeName={m.home_team.short_name ?? m.home_team.name}
+          awayName={m.away_team.short_name ?? m.away_team.name}
+        />
       </motion.div>
 
       {/* Goals / xG Trend */}

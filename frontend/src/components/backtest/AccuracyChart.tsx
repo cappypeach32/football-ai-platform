@@ -39,13 +39,21 @@ export function AccuracyChart({ data }: Props) {
         <AreaChart data={chartData}>
           <defs>
             <linearGradient id="accuracyGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#00FF87" stopOpacity={0.2} />
+              <stop offset="5%" stopColor="#00FF87" stopOpacity={0.28} />
               <stop offset="95%" stopColor="#00FF87" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="roiGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#58A6FF" stopOpacity={0.15} />
+              <stop offset="5%" stopColor="#58A6FF" stopOpacity={0.22} />
               <stop offset="95%" stopColor="#58A6FF" stopOpacity={0} />
             </linearGradient>
+            <filter id="lineGlowGreen" x="-10%" y="-40%" width="120%" height="180%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <filter id="lineGlowBlue" x="-10%" y="-40%" width="120%" height="180%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#30363D" />
           <XAxis dataKey="month" tick={{ fill: "#7D8590", fontSize: 11 }} />
@@ -54,8 +62,8 @@ export function AccuracyChart({ data }: Props) {
             contentStyle={{ background: "#1C2128", border: "1px solid #30363D", borderRadius: "8px", color: "#E6EDF3" }}
             formatter={(val: number, name: string) => [`${val}%`, name]}
           />
-          <Area type="monotone" dataKey="accuracy_pct" stroke="#00FF87" fill="url(#accuracyGrad)" strokeWidth={2} name="Accuracy" />
-          <Area type="monotone" dataKey="roi" stroke="#58A6FF" fill="url(#roiGrad)" strokeWidth={2} name="ROI" />
+          <Area type="monotone" dataKey="accuracy_pct" stroke="#00FF87" strokeWidth={2.5} fill="url(#accuracyGrad)" name="Accuracy" dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: "#00FF87" }} filter="url(#lineGlowGreen)" />
+          <Area type="monotone" dataKey="roi" stroke="#58A6FF" strokeWidth={2.5} fill="url(#roiGrad)" name="ROI" dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: "#58A6FF" }} filter="url(#lineGlowBlue)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>

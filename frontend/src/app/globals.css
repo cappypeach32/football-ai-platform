@@ -338,5 +338,35 @@
   .stat-number {
     animation: numberIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
   }
+
+  /* ─── Mobile responsive polish ───────────────────────── */
+  @media (max-width: 640px) {
+    /* Tighter card padding on phones */
+    .glass-card {
+      padding: 0.875rem;
+    }
+
+    /* Match cards scroll nicely */
+    .match-card {
+      padding: 0.875rem;
+      /* Disable spring transform on touch to reduce jank */
+      transform: none !important;
+    }
+
+    /* Wider touch targets for buttons */
+    button, a {
+      min-height: 36px;
+    }
+
+    /* Ensure chart containers don't overflow */
+    .recharts-responsive-container {
+      max-width: 100%;
+    }
+
+    /* Stack the stat-number font a touch smaller */
+    .stat-number {
+      font-size: 1.1rem;
+    }
+  }
 }
 
