@@ -4,10 +4,12 @@ import { Bell, Search, User, Wifi } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { analyticsApi } from "@/lib/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { SearchPalette } from "@/components/layout/SearchPalette";
 
 export function TopBar() {
   const [showAlerts, setShowAlerts] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const { data: alerts = [] } = useQuery<any[]>({
     queryKey: ["analytics", "alerts"],
@@ -16,32 +18,49 @@ export function TopBar() {
     staleTime: 2 * 60 * 1000,
   });
 
-  return (
-    <header className="h-16 bg-surface-elevated/60 backdrop-blur-xl border-b border-surface-border/50 flex items-center justify-between px-6 gap-4 z-20 relative">
-      {/* Subtle neon glow line along the bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-neon-green/25 to-transparent pointer-events-none" />
-      {/* Search */}
-      <div className="relative max-w-md w-full hidden md:flex items-center">
-        <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search teams, leagues, matches..."
-          className="w-full bg-surface-card border border-surface-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-green/50 transition-colors"
-        />
-        <kbd className="absolute right-3 text-[10px] text-muted-foreground bg-surface-border px-1.5 py-0.5 rounded">⌘K</kbd>
-      </div>
+  // Global ⌘K / Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
-      {/* Right side */}
-      <div className="flex items-center gap-3 ml-auto">
-        {/* Live indicator */}
-        <motion.div
-          animate={{ opacity: [1, 0.5, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-400"
+  return (
+    <>
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+
+      <header className="h-16 bg-surface-elevated/60 backdrop-blur-xl border-b border-surface-border/50 flex items-center justify-between px-6 gap-4 z-20 relative">
+        {/* Subtle neon glow line along the bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-neon-green/25 to-transparent pointer-events-none" />
+
+        {/* Search trigger */}
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="relative max-w-md w-full hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-card border border-surface-border hover:border-neon-green/40 transition-colors group text-left"
         >
-          <Wifi className="w-3.5 h-3.5" />
-          <span>Live Feed Active</span>
-        </motion.div>
+          <Search className="w-4 h-4 text-muted-foreground group-hover:text-neon-green transition-colors" />
+          <span className="flex-1 text-sm text-muted-foreground group-hover:text-foreground/60 transition-colors">
+            Search teams, leagues, matches…
+          </span>
+          <kbd className="text-[10px] text-muted-foreground bg-surface-border/60 px-1.5 py-0.5 rounded border border-surface-border/40">⌘K</kbd>
+        </button>
+
+        {/* Right side */}
+        <div className="flex items-center gap-3 ml-auto">
+          {/* Live indicator */}
+          <motion.div
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-400"
+          >
+            <Wifi className="w-3.5 h-3.5" />
+            <span>Live Feed Active</span>
+          </motion.div>
 
         {/* Notifications */}
         <div className="relative">
@@ -101,5 +120,6 @@ export function TopBar() {
         </button>
       </div>
     </header>
+    </>
   );
 }

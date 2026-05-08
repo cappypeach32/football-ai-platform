@@ -88,7 +88,12 @@ export function PredictionCard({ prediction: p, compact }: Props) {
       >
         {/* Top accent line for high-confidence predictions */}
         {isHighConf && (
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-neon-green/60 to-transparent rounded-t-xl" />
+          <motion.div
+            className="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,135,0.7), transparent)" }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
         )}
 
         {/* League & date */}
@@ -139,10 +144,21 @@ export function PredictionCard({ prediction: p, compact }: Props) {
         {/* Footer badges */}
         {!compact && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={confClass}>
+            {/* Neural glow confidence badge */}
+            <motion.span
+              className={confClass}
+              animate={isHighConf ? {
+                boxShadow: [
+                  "0 0 0px rgba(0,255,135,0)",
+                  "0 0 10px rgba(0,255,135,0.35)",
+                  "0 0 0px rgba(0,255,135,0)",
+                ],
+              } : {}}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            >
               <Brain className="w-3 h-3" />
               {confLabel} {p.confidence_score.toFixed(0)}%
-            </span>
+            </motion.span>
             {p.value_bet && (
               <motion.span
                 className="value-bet-badge"

@@ -13,8 +13,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { cn } from "@/lib/utils";
-
+import { cn } from "@/lib/utils";import { ConfidenceRing } from "@/components/ui/ConfidenceRing";
 // Charts are below-the-fold — lazy loaded to reduce initial bundle
 const TeamRadarChart = dynamic(
   () => import("@/components/analytics/TeamRadarChart").then((m) => ({ default: m.TeamRadarChart })),
@@ -289,14 +288,16 @@ export default function PredictionDetailPage({ params }: { params: { id: string 
         </div>
 
         {/* Confidence + Value badge */}
-        <div className="flex items-center justify-center gap-3">
-          <span className={cn("text-2xl font-black", confColor)}>
-            <Brain className="w-5 h-5 inline mr-1" />{p.confidence_score.toFixed(0)}% Confidence
-          </span>
+        <div className="flex items-center justify-center gap-4 flex-wrap">
+          <ConfidenceRing value={p.confidence_score} size={88} label="AI Confidence" />
           {p.value_bet && (
-            <span className="value-bet-badge text-sm px-3 py-1">
+            <motion.span
+              className="value-bet-badge text-sm px-3 py-1"
+              animate={{ boxShadow: ["0 0 0 rgba(0,255,135,0)", "0 0 14px rgba(0,255,135,0.5)", "0 0 0 rgba(0,255,135,0)"] }}
+              transition={{ duration: 2.2, repeat: Infinity }}
+            >
               <Zap className="w-4 h-4" /> Value Bet
-            </span>
+            </motion.span>
           )}
         </div>
       </motion.div>
