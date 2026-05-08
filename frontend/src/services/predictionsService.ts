@@ -2,8 +2,8 @@ import { apiClient } from "./apiClient";
 
 export const predictionsService = {
   getAll: (params?: Record<string, unknown>) => apiClient.get("/predictions/", { params }),
-  getByTeam: (teamName: string, limit = 1) =>
-    apiClient.get("/predictions/", { params: { team_name: teamName, limit } }),
+  getByTeam: (teamName: string, limit = 1, upcomingOnly = true) =>
+    apiClient.get("/predictions/", { params: { team_name: teamName, limit, upcoming_only: upcomingOnly } }),
   getTop: () => apiClient.get("/predictions/top"),
   getById: (id: number) => apiClient.get(`/predictions/${id}`),
   getAnalysis: (id: number) => apiClient.get(`/predictions/${id}/analysis`),

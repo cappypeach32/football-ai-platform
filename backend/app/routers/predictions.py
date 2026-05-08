@@ -48,7 +48,9 @@ async def list_predictions(
         .offset(offset)
     )
     if upcoming_only:
-        q = q.where(Match.match_date >= datetime.utcnow())
+        # Include scheduled matches AND matches that kicked off recently (in-play window: 3h)
+        from datetime import timedelta
+        q = q.where(Match.match_date >= datetime.utcnow() - timedelta(hours=3))
     if league_id:
         q = q.where(Match.league_id == league_id)
     if value_bets_only:
@@ -59,11 +61,16 @@ async def list_predictions(
             home_alias.name.ilike(pattern),
             away_alias.name.ilike(pattern),
         ))
-        # Order by proximity to now (soonest first), then confidence
-        q = q.order_by(
-            Match.match_date,
-            desc(Prediction.confidence_score),
-        )
+        if not upcoming_only:
+            # When fetching all (including past), sort closest to now first
+            from sqlalchemy import func
+            now_ts = datetime.utcnow().timestamp()
+            q = q.order_by(
+                func.abs(func.strftime("%s", Match.match_date) - now_ts),
+                desc(Prediction.confidence_score),
+            )
+        else:
+            q = q.order_by(Match.match_date, desc(Prediction.confidence_score))
     else:
         # Soonest upcoming first, then by confidence within same-day matches
         q = q.order_by(Match.match_date, desc(Prediction.confidence_score))

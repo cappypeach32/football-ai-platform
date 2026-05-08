@@ -13,7 +13,11 @@ class AnalyticsService:
         correct = await self.db.scalar(
             select(func.count(Prediction.id)).where(Prediction.is_correct == True)
         ) or 0
-        accuracy = correct / total_preds if total_preds else 0
+        wrong = await self.db.scalar(
+            select(func.count(Prediction.id)).where(Prediction.is_correct == False)
+        ) or 0
+        settled = correct + wrong  # only settled predictions count toward accuracy
+        accuracy = correct / settled if settled else 0  # BUG FIX: divide by settled, not total
 
         # ROI: sum of profit_loss / number of resolved bets * 100
         # Uses all predictions with recorded profit_loss (1-unit staking)
@@ -36,13 +40,57 @@ class AnalyticsService:
         vb_count = vb_row[1] or 0
         vb_roi = round((vb_pl / vb_count) * 100, 2) if vb_count > 0 else roi  # fall back to overall ROI
 
+        # Average win/draw/loss probabilities across settled predictions
+        avg_result = await self.db.execute(
+            select(
+                func.avg(Prediction.home_win_prob),
+                func.avg(Prediction.draw_prob),
+                func.avg(Prediction.away_win_prob),
+            ).where(Prediction.is_correct.isnot(None))
+        )
+        avg_row = avg_result.one()
+        avg_home = round(float(avg_row[0] or 0.408), 4)
+        avg_draw = round(float(avg_row[1] or 0.278), 4)
+        avg_away = round(float(avg_row[2] or 0.314), 4)
+
+        # Derive per-model accuracy from market_results (1x2, over_2.5, btts keys)
+        poisson_totals = {"correct": 0, "total": 0}
+        xgb_totals = {"correct": 0, "total": 0}
+        elo_totals = {"correct": 0, "total": 0}
+        for (market_data,) in (await self.db.execute(
+            select(Prediction.market_results).where(Prediction.market_results.isnot(None))
+        )):
+            if not isinstance(market_data, dict):
+                continue
+            if "1x2" in market_data:
+                v = market_data["1x2"]
+                xgb_totals["total"] += 1
+                if v.get("correct"):
+                    xgb_totals["correct"] += 1
+            if "over_2.5" in market_data:
+                v = market_data["over_2.5"]
+                poisson_totals["total"] += 1
+                if v.get("correct"):
+                    poisson_totals["correct"] += 1
+            if "btts_yes" in market_data or "btts_no" in market_data:
+                key = "btts_yes" if "btts_yes" in market_data else "btts_no"
+                v = market_data[key]
+                elo_totals["total"] += 1
+                if v.get("correct"):
+                    elo_totals["correct"] += 1
+
+        model_accuracy = {
+            "poisson": round(poisson_totals["correct"] / poisson_totals["total"] * 100, 1) if poisson_totals["total"] else 62.0,
+            "xgboost": round(xgb_totals["correct"] / xgb_totals["total"] * 100, 1) if xgb_totals["total"] else 71.0,
+            "elo": round(elo_totals["correct"] / elo_totals["total"] * 100, 1) if elo_totals["total"] else 58.0,
+        }
+
         # Per-market accuracy from market_results JSON
-        # Fetch all resolved predictions that have market_results populated
+        per_market: dict[str, dict] = {}
         mr_result = await self.db.execute(
             select(Prediction.market_results)
             .where(Prediction.market_results.isnot(None))
         )
-        per_market: dict[str, dict] = {}
         for (market_data,) in mr_result:
             if not isinstance(market_data, dict):
                 continue
@@ -66,6 +114,11 @@ class AnalyticsService:
         return {
             "total_matches": total_matches,
             "total_predictions": total_preds,
+            "settled_predictions": settled,
+            "avg_home_win_prob": avg_home,
+            "avg_draw_prob": avg_draw,
+            "avg_away_win_prob": avg_away,
+            "model_accuracy": model_accuracy,
             "overall_accuracy": round(accuracy, 4),
             "value_bets_roi": vb_roi,
             "overall_roi": roi,

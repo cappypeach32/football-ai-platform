@@ -37,29 +37,45 @@ export function PredictionDrawer({
   onClose: () => void;
 }) {
   const { data: homeResults, isLoading: loadingHome } = useQuery({
-    queryKey: ["pred-by-team", match.home_team],
+    queryKey: ["pred-by-team", match.home_team, "live"],
     queryFn: () =>
-      predictionsApi.getByTeam(match.home_team, 5).then((r) => r.data as Prediction[]),
+      predictionsApi.getByTeam(match.home_team, 20, false).then((r) => r.data as Prediction[]),
   });
   const { data: awayResults, isLoading: loadingAway } = useQuery({
-    queryKey: ["pred-by-team", match.away_team],
+    queryKey: ["pred-by-team", match.away_team, "live"],
     queryFn: () =>
-      predictionsApi.getByTeam(match.away_team, 5).then((r) => r.data as Prediction[]),
+      predictionsApi.getByTeam(match.away_team, 20, false).then((r) => r.data as Prediction[]),
     enabled: !homeResults?.length,
   });
 
   const isLoading = loadingHome || loadingAway;
   const allCandidates = [...(homeResults ?? []), ...(awayResults ?? [])];
-  const homeSlug = match.home_team.toLowerCase().slice(0, 6);
-  const awaySlug = match.away_team.toLowerCase().slice(0, 6);
+
+  // Match ESPN team names against DB team names via token overlap
+  function teamMatches(espnName: string, dbName: string): boolean {
+    const esp = espnName.toLowerCase().replace(/[^a-z0-9 ]/g, "");
+    const db  = dbName.toLowerCase().replace(/[^a-z0-9 ]/g, "");
+    if (esp === db || esp.includes(db) || db.includes(esp)) return true;
+    // Token overlap: at least one significant word in common
+    const STOP = new Set(["fc", "cf", "sc", "ac", "united", "city", "the"]);
+    const espTokens = esp.split(" ").filter((t) => t.length > 2 && !STOP.has(t));
+    const dbTokens  = db.split(" ").filter((t) => t.length > 2 && !STOP.has(t));
+    return espTokens.some((t) => dbTokens.includes(t));
+  }
+
   const basePred =
     allCandidates.find(
       (p) =>
-        (p.match.home_team.name.toLowerCase().includes(homeSlug) ||
-          p.match.away_team.name.toLowerCase().includes(homeSlug)) &&
-        (p.match.home_team.name.toLowerCase().includes(awaySlug) ||
-          p.match.away_team.name.toLowerCase().includes(awaySlug))
-    ) ?? null;
+        teamMatches(match.home_team, p.match.home_team.name) &&
+        teamMatches(match.away_team, p.match.away_team.name)
+    ) ??
+    // Fallback: any candidate containing the home team name
+    allCandidates.find(
+      (p) =>
+        teamMatches(match.home_team, p.match.home_team.name) ||
+        teamMatches(match.away_team, p.match.away_team.name)
+    ) ??
+    null;
 
   const { data: preMatchData, isFetching: fetchingRich } = useQuery({
     queryKey: ["pre-match", basePred?.id],

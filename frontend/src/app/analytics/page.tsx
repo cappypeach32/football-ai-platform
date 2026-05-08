@@ -60,9 +60,9 @@ export default function AnalyticsPage() {
                 <WinProbabilityGauge
                   homeName="Home Win"
                   awayName="Away Win"
-                  homeProb={overview.overall_accuracy}
-                  drawProb={Math.max(0, 1 - overview.overall_accuracy - 0.28)}
-                  awayProb={0.28}
+                  homeProb={overview.avg_home_win_prob ?? overview.overall_accuracy}
+                  drawProb={overview.avg_draw_prob ?? Math.max(0, 1 - overview.overall_accuracy - 0.28)}
+                  awayProb={overview.avg_away_win_prob ?? 0.28}
                   className="h-full"
                 />
               )}

@@ -27,6 +27,11 @@ class AnalyticsOverview(BaseModel):
     value_bets_roi: float
     overall_roi: float = 0.0
     resolved_bets: int = 0
+    settled_predictions: int = 0
+    avg_home_win_prob: float = 0.408
+    avg_draw_prob: float = 0.278
+    avg_away_win_prob: float = 0.314
+    model_accuracy: dict[str, float] = {}
     top_leagues: list[dict[str, Any]]
     accuracy_by_market: dict[str, dict]
     recent_form: list[dict[str, Any]]

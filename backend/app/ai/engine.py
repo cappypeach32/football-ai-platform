@@ -431,10 +431,12 @@ class PredictionEngine:
         # Check primary recommendation for value
         if primary_odds and best_1x2_prob > 0:
             implied = 1.0 / primary_odds
-            if best_1x2_prob > implied * 1.05:
+            # Require 3% edge over implied probability
+            if best_1x2_prob > implied * 1.03:
                 is_value = True
         else:
-            if best_1x2_prob >= 0.52 and confidence >= 60:
+            # Fallback when odds unavailable: require clear probability edge + minimum confidence
+            if best_1x2_prob >= 0.52 and confidence >= 45:
                 is_value = True
 
         return recommended, is_value

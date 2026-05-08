@@ -7,19 +7,44 @@ from app.models import Prediction, Match, League, PredictionResult, MatchStatus
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 UNIT_STAKE = 1.0
-DEFAULT_ODDS = 1.85  # fallback for markets without stored odds
+# Market-specific fallback odds (realistic European league averages when live odds unavailable)
+DEFAULT_ODDS_HOME = 2.05
+DEFAULT_ODDS_DRAW = 3.35
+DEFAULT_ODDS_AWAY = 3.25
+DEFAULT_ODDS_OU   = 1.90  # over/under / btts markets
+
+# Minimum edge over implied probability to flag as value bet (3%)
+VALUE_EDGE_THRESHOLD = 1.03
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get_odds(pred: Prediction, bet: str | None) -> float:
     if bet == "1":
-        return pred.odds_home or DEFAULT_ODDS
+        return pred.odds_home or DEFAULT_ODDS_HOME
     elif bet == "X":
-        return pred.odds_draw or DEFAULT_ODDS
+        return pred.odds_draw or DEFAULT_ODDS_DRAW
     elif bet == "2":
-        return pred.odds_away or DEFAULT_ODDS
-    return DEFAULT_ODDS
+        return pred.odds_away or DEFAULT_ODDS_AWAY
+    return DEFAULT_ODDS_OU
+
+
+def _compute_value_bet(pred: Prediction) -> bool:
+    """True if model probability exceeds implied probability by VALUE_EDGE_THRESHOLD."""
+    bet = pred.recommended_bet
+    if bet == "1":
+        odds = pred.odds_home or DEFAULT_ODDS_HOME
+        prob = pred.home_win_prob or 0.0
+    elif bet == "X":
+        odds = pred.odds_draw or DEFAULT_ODDS_DRAW
+        prob = pred.draw_prob or 0.0
+    elif bet == "2":
+        odds = pred.odds_away or DEFAULT_ODDS_AWAY
+        prob = pred.away_win_prob or 0.0
+    else:
+        return False
+    implied = 1.0 / odds
+    return bool(prob > implied * VALUE_EDGE_THRESHOLD)
 
 
 def _evaluate_bet(bet: str | None, home: int, away: int) -> bool | None:
@@ -134,6 +159,7 @@ class BacktestService:
             pred.is_correct = is_correct
             pred.profit_loss = round((odds - 1) * UNIT_STAKE if is_correct else -UNIT_STAKE, 4)
             pred.result = PredictionResult.WIN if is_correct else PredictionResult.LOSS
+            pred.value_bet = _compute_value_bet(pred)  # set at resolution so odds context is available
 
             # Evaluate all markets and store in market_results JSON
             market_results: dict = {}
