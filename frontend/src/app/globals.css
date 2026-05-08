@@ -32,129 +32,174 @@
     @apply border-border;
   }
 
+  /* ─── Futuristic grid background ─────────────────────── */
   body {
     @apply bg-surface text-foreground antialiased;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 255, 135, 0.05) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 90% 80%, rgba(0, 212, 255, 0.03) 0%, transparent 50%);
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 255, 135, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 80%, rgba(0, 212, 255, 0.04) 0%, transparent 50%),
+      linear-gradient(rgba(48, 54, 61, 0.18) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(48, 54, 61, 0.18) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    background-position: 0 0, 0 0, center center, center center;
   }
 
   html {
     scroll-behavior: smooth;
   }
 
+  /* ─── Heading font: Space Grotesk ─────────────────────── */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-space), system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
   ::selection {
     background: rgba(0, 255, 135, 0.25);
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: #0D1117;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #30363D;
-    border-radius: 3px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: #484F58;
-  }
+  /* ─── Scrollbar ───────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #090D14; }
+  ::-webkit-scrollbar-thumb { background: #30363D; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #00FF87; }
 }
 
 @layer components {
-  /* Glass card */
+
+  /* ─── Glass card ─────────────────────────────────────── */
   .glass-card {
     @apply bg-surface-card border border-surface-border rounded-xl shadow-glass
       backdrop-blur-sm relative overflow-hidden;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
   }
-
   .glass-card::before {
     content: "";
     @apply absolute inset-0 bg-card-shine pointer-events-none;
   }
 
-  /* Neon border */
-  .neon-border-green {
-    @apply border border-neon-green/30 shadow-neon-green;
+  /* ─── Match card (interactive glass card) ────────────── */
+  .match-card {
+    @apply glass-card p-4 cursor-pointer;
+  }
+  .match-card:hover {
+    @apply -translate-y-1;
+    border-color: rgba(0, 255, 135, 0.25);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,255,135,0.12),
+                0 0 24px rgba(0,255,135,0.08), inset 0 1px 0 rgba(255,255,255,0.06);
   }
 
-  .neon-border-blue {
-    @apply border border-neon-blue/30 shadow-neon-blue;
-  }
+  /* ─── Neon borders ───────────────────────────────────── */
+  .neon-border-green  { @apply border border-neon-green/30 shadow-neon-green; }
+  .neon-border-blue   { @apply border border-neon-blue/30 shadow-neon-blue; }
+  .neon-border-yellow { @apply border border-neon-yellow/30 shadow-neon-yellow; }
 
-  /* Stat badge */
-  .stat-badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
-  }
+  /* ─── Hover glow helpers ─────────────────────────────── */
+  .hover-glow-green  { @apply transition-shadow duration-300 hover:shadow-neon-green; }
+  .hover-glow-blue   { @apply transition-shadow duration-300 hover:shadow-neon-blue; }
+  .hover-glow-yellow { @apply transition-shadow duration-300 hover:shadow-neon-yellow; }
 
-  /* Probability bar */
-  .prob-bar {
-    @apply h-2 rounded-full transition-all duration-700 ease-out;
-  }
+  /* ─── Gradient text ──────────────────────────────────── */
+  .gradient-text-green  { @apply bg-gradient-to-r from-neon-green to-neon-blue bg-clip-text text-transparent; }
+  .gradient-text-yellow { @apply bg-gradient-to-r from-neon-yellow to-neon-amber bg-clip-text text-transparent; }
+  .gradient-text-purple { @apply bg-gradient-to-r from-neon-purple to-neon-pink bg-clip-text text-transparent; }
+  .gradient-text-multi  { @apply bg-gradient-to-r from-neon-green via-neon-blue to-neon-purple bg-clip-text text-transparent; }
 
-  /* Skeleton shimmer */
+  /* ─── Skeleton shimmer ───────────────────────────────── */
   .skeleton {
     @apply rounded-lg animate-shimmer;
-    background: linear-gradient(
-      90deg,
-      #1C2128 25%,
-      #252D36 50%,
-      #1C2128 75%
-    );
+    background: linear-gradient(90deg, #1C2128 25%, #252D36 50%, #1C2128 75%);
     background-size: 200% 100%;
   }
 
-  /* AI confidence ring */
-  .confidence-ring {
-    @apply relative inline-flex items-center justify-center;
+  /* ─── Stat badge ─────────────────────────────────────── */
+  .stat-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .value-bet-badge      { @apply stat-badge bg-neon-green/15 text-neon-green border border-neon-green/30; }
+  .live-badge           { @apply stat-badge bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse; }
+  .yellow-badge         { @apply stat-badge bg-neon-yellow/15 text-neon-yellow border border-neon-yellow/30; }
+  .confidence-high      { @apply stat-badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/30; }
+  .confidence-medium    { @apply stat-badge bg-amber-500/15 text-amber-400 border border-amber-500/30; }
+  .confidence-low       { @apply stat-badge bg-red-500/15 text-red-400 border border-red-500/30; }
+
+  /* ─── Probability bar ────────────────────────────────── */
+  .prob-bar { @apply h-2 rounded-full transition-all duration-700 ease-out; }
+
+  /* ─── Primary button ─────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           text-sm font-semibold text-surface bg-neon-green
+           transition-all duration-200 active:scale-95;
+    font-family: var(--font-space), system-ui, sans-serif;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 0 16px rgba(0,255,135,0.4), 0 0 32px rgba(0,255,135,0.15);
   }
 
-  /* Gradient text */
-  .gradient-text-green {
-    @apply bg-gradient-to-r from-neon-green to-neon-blue bg-clip-text text-transparent;
+  /* ─── Ghost button ───────────────────────────────────── */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           text-sm font-medium text-foreground border border-surface-border
+           transition-all duration-200 hover:border-neon-green/40
+           hover:text-neon-green hover:bg-neon-green/5 active:scale-95;
+    font-family: var(--font-space), system-ui, sans-serif;
   }
 
-  .gradient-text-purple {
-    @apply bg-gradient-to-r from-neon-purple to-neon-pink bg-clip-text text-transparent;
+  /* ─── Icon glow on hover ─────────────────────────────── */
+  .icon-glow-green { @apply transition-all duration-200; }
+  .icon-glow-green:hover { filter: drop-shadow(0 0 6px rgba(0,255,135,0.7)); }
+
+  /* ─── Navigation active ──────────────────────────────── */
+  .nav-item-active { @apply text-neon-green bg-neon-green/10 border-l-2 border-neon-green; }
+
+  /* ─── Card stat row ──────────────────────────────────── */
+  .card-stat {
+    @apply flex items-center justify-between py-2 border-b border-surface-border/60 last:border-0;
+  }
+  .card-stat-label { @apply text-xs text-muted-foreground; }
+  .card-stat-value { @apply text-sm font-semibold text-foreground font-display; }
+
+  /* ─── Chip / tag ─────────────────────────────────────── */
+  .chip {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium
+           bg-surface-elevated border border-surface-border text-muted-foreground
+           transition-colors duration-150 hover:border-neon-green/30 hover:text-foreground;
   }
 
-  /* Hover glow effect */
-  .hover-glow-green {
-    @apply transition-shadow duration-300;
+  /* ─── AI confidence ring ─────────────────────────────── */
+  .confidence-ring { @apply relative inline-flex items-center justify-center; }
+
+  /* ─── Section heading ────────────────────────────────── */
+  .section-heading {
+    @apply text-xl font-bold tracking-tight text-foreground;
+    font-family: var(--font-space), system-ui, sans-serif;
   }
 
-  .hover-glow-green:hover {
-    @apply shadow-neon-green;
+  /* ─── Glow dot (live indicator) ──────────────────────── */
+  .glow-dot {
+    @apply w-2 h-2 rounded-full bg-red-500;
+    box-shadow: 0 0 6px rgba(239,68,68,0.8);
+    animation: pulseNeon 1.5s infinite;
+  }
+  .glow-dot-green {
+    @apply w-2 h-2 rounded-full bg-neon-green;
+    box-shadow: 0 0 6px rgba(0,255,135,0.8);
+    animation: pulseNeon 2s infinite;
   }
 
-  /* Navigation active */
-  .nav-item-active {
-    @apply text-neon-green bg-neon-green/10 border-l-2 border-neon-green;
+  /* ─── Input field ────────────────────────────────────── */
+  .input-field {
+    @apply w-full px-3 py-2 rounded-lg bg-surface-elevated border border-surface-border
+           text-sm text-foreground placeholder:text-muted-foreground
+           outline-none transition-all duration-200
+           focus:border-neon-green/50 focus:shadow-neon-green-sm;
   }
 
-  /* Match card */
-  .match-card {
-    @apply glass-card p-4 hover:border-neon-green/20 transition-all duration-300 cursor-pointer
-      hover:shadow-card-glow hover:-translate-y-0.5;
+  /* ─── Data table row ─────────────────────────────────── */
+  .table-row-hover {
+    @apply transition-colors duration-150 hover:bg-neon-green/5 hover:border-l-2
+           hover:border-neon-green/40 cursor-pointer;
   }
-
-  /* Value bet badge */
-  .value-bet-badge {
-    @apply stat-badge bg-neon-green/15 text-neon-green border border-neon-green/30;
-  }
-
-  /* Live badge */
-  .live-badge {
-    @apply stat-badge bg-red-500/15 text-red-400 border border-red-500/30;
-  }
-
-  /* Confidence tier badges */
-  .confidence-high   { @apply stat-badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/30; }
-  .confidence-medium { @apply stat-badge bg-amber-500/15 text-amber-400 border border-amber-500/30; }
-  .confidence-low    { @apply stat-badge bg-red-500/15 text-red-400 border border-red-500/30; }
 }

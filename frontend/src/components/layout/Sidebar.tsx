@@ -42,7 +42,8 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-surface-border">
-        <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center">
+        <div className="relative flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center"
+             style={{ boxShadow: "0 0 16px rgba(0,255,135,0.35)" }}>
           <Zap className="w-5 h-5 text-surface" />
         </div>
         {!collapsed && (
@@ -52,8 +53,8 @@ export function Sidebar() {
             exit={{ opacity: 0 }}
             className="min-w-0"
           >
-            <p className="text-sm font-bold text-foreground truncate">Football AI</p>
-            <p className="text-xs text-muted-foreground truncate">Intelligence Platform</p>
+            <p className="text-sm font-bold text-foreground truncate font-display tracking-tight">Football AI</p>
+            <p className="text-[10px] text-neon-green/60 truncate font-display uppercase tracking-widest">Intelligence</p>
           </motion.div>
         )}
       </div>
@@ -65,15 +66,19 @@ export function Sidebar() {
           return (
             <Link key={href} href={href}>
               <motion.div
-                whileHover={{ x: 2 }}
+                whileHover={{ x: 3 }}
+                whileTap={{ scale: 0.97 }}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 relative group",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group",
                   active
                     ? "bg-neon-green/10 text-neon-green border border-neon-green/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-card"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-card hover:border hover:border-surface-border"
                 )}
               >
-                <Icon className={cn("w-5 h-5 flex-shrink-0", active && "text-neon-green")} />
+                <Icon className={cn(
+                  "w-5 h-5 flex-shrink-0 transition-all duration-200",
+                  active ? "text-neon-green" : "group-hover:text-neon-green/70"
+                )} style={active ? { filter: "drop-shadow(0 0 4px rgba(0,255,135,0.5))" } : {}} />
                 {!collapsed && (
                   <span className="truncate">{label}</span>
                 )}
