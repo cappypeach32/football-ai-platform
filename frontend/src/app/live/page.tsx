@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { matchesApi } from "@/lib/api";
 import { useEspnLive } from "@/hooks/useEspnLive";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { TeamLogo } from "@/components/ui/TeamLogo";
 import type { Match, EspnLiveMatch } from "@/types";
 import {
   ChevronLeft, ChevronRight, Calendar, Wifi, WifiOff, Radio, Maximize2, Minimize2,
@@ -61,7 +62,7 @@ function EspnLiveCard({
         {/* Home */}
         <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
           {match.home_logo ? (
-            <img src={match.home_logo} alt="" className="w-10 h-10 object-contain" loading="lazy" />
+            <TeamLogo src={match.home_logo} name={match.home_team} className="w-10 h-10" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-surface-elevated" />
           )}
@@ -83,7 +84,7 @@ function EspnLiveCard({
         {/* Away */}
         <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
           {match.away_logo ? (
-            <img src={match.away_logo} alt="" className="w-10 h-10 object-contain" loading="lazy" />
+            <TeamLogo src={match.away_logo} name={match.away_team} className="w-10 h-10" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-surface-elevated" />
           )}
@@ -131,7 +132,7 @@ function MatchRow({ match }: { match: Match }) {
       {/* Home team */}
       <div className="flex-1 flex items-center justify-end gap-2">
         {match.home_team.logo_url && (
-          <img src={match.home_team.logo_url} alt="" className="w-5 h-5 object-contain" />
+          <TeamLogo src={match.home_team.logo_url} name={match.home_team.name} className="w-5 h-5" />
         )}
         <span className={`text-sm font-medium ${isLive ? "text-foreground" : "text-foreground/80"}`}>
           {match.home_team.name}
@@ -152,7 +153,7 @@ function MatchRow({ match }: { match: Match }) {
       {/* Away team */}
       <div className="flex-1 flex items-center justify-start gap-2">
         {match.away_team.logo_url && (
-          <img src={match.away_team.logo_url} alt="" className="w-5 h-5 object-contain" />
+          <TeamLogo src={match.away_team.logo_url} name={match.away_team.name} className="w-5 h-5" />
         )}
         <span className={`text-sm font-medium ${isLive ? "text-foreground" : "text-foreground/80"}`}>
           {match.away_team.name}
@@ -387,7 +388,7 @@ export default function LivePage() {
                 >
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-border bg-surface-elevated">
                     {league.logo_url && (
-                      <img src={league.logo_url} alt="" className="w-5 h-5 object-contain" />
+                      <TeamLogo src={league.logo_url} name={league.name} className="w-5 h-5" />
                     )}
                     <div>
                       <span className="text-sm font-semibold text-foreground">{league.name}</span>

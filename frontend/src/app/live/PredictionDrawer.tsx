@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { predictionsApi } from "@/lib/api";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { TeamLogo } from "@/components/ui/TeamLogo";
 import type { EspnLiveMatch, Prediction } from "@/types";
 import { X, Brain, TrendingUp, AlertTriangle, ExternalLink } from "lucide-react";
 import Link from "next/link";
@@ -129,7 +130,7 @@ export function PredictionDrawer({
           <div className="flex items-center gap-3">
             <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
               {match.home_logo ? (
-                <img src={match.home_logo} alt="" className="w-12 h-12 object-contain" loading="lazy" />
+                <TeamLogo src={match.home_logo} name={match.home_team} className="w-12 h-12" />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-surface-elevated" />
               )}
@@ -146,7 +147,7 @@ export function PredictionDrawer({
 
             <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
               {match.away_logo ? (
-                <img src={match.away_logo} alt="" className="w-12 h-12 object-contain" loading="lazy" />
+                <TeamLogo src={match.away_logo} name={match.away_team} className="w-12 h-12" />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-surface-elevated" />
               )}

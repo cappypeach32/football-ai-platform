@@ -10,11 +10,12 @@ import {
   MapPin, ArrowLeft, Shield, Target, BarChart2
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 import { ConfidenceRing } from "@/components/ui/ConfidenceRing";
+import { TeamLogo } from "@/components/ui/TeamLogo";
+import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { MatchIntelligencePanel } from "@/components/predictions/MatchIntelligencePanel";
 import { OddsTracker } from "@/components/predictions/OddsTracker";
 // Charts are below-the-fold — lazy loaded to reduce initial bundle
@@ -109,7 +110,7 @@ function InjuryRow({ player }: { player: InjuredPlayerInfo }) {
   return (
     <div className="flex items-center gap-3 py-2 border-b border-surface-border/50 last:border-0">
       {player.photo_url ? (
-        <img src={player.photo_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+        <PlayerAvatar src={player.photo_url} name={player.name} />
       ) : (
         <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center">
           <Shield className="w-4 h-4 text-muted-foreground" />
@@ -243,7 +244,7 @@ export default function PredictionDetailPage({ params }: { params: { id: string 
         <div className="flex items-center justify-between gap-6 my-6">
           <div className="flex-1 text-center space-y-2">
             {m.home_team.logo_url && (
-              <Image src={m.home_team.logo_url} alt={m.home_team.name} width={64} height={64} className="mx-auto object-contain" />
+              <TeamLogo src={m.home_team.logo_url} name={m.home_team.name} size={64} className="mx-auto" />
             )}
             <p className="text-xl font-bold text-foreground">{m.home_team.name}</p>
             <p className="text-xs text-muted-foreground">ELO {m.home_team.elo_rating.toFixed(0)}</p>
@@ -280,7 +281,7 @@ export default function PredictionDetailPage({ params }: { params: { id: string 
 
           <div className="flex-1 text-center space-y-2">
             {m.away_team.logo_url && (
-              <Image src={m.away_team.logo_url} alt={m.away_team.name} width={64} height={64} className="mx-auto object-contain" />
+              <TeamLogo src={m.away_team.logo_url} name={m.away_team.name} size={64} className="mx-auto" />
             )}
             <p className="text-xl font-bold text-foreground">{m.away_team.name}</p>
             <p className="text-xs text-muted-foreground">ELO {m.away_team.elo_rating.toFixed(0)}</p>
