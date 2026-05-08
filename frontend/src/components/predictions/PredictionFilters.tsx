@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { Filter, Zap, Clock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Filter, Zap, Clock, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { leaguesApi } from "@/lib/api";
+import type { League } from "@/types";
 
 interface Filters {
   min_confidence: number;
@@ -27,6 +29,12 @@ const CONFIDENCE_PRESETS = [
 ];
 
 export function PredictionFilters({ filters, onChange }: Props) {
+  const { data: leagues } = useQuery<League[]>({
+    queryKey: ["leagues"],
+    queryFn: () => leaguesApi.getAll().then((r) => r.data as League[]),
+    staleTime: 5 * 60 * 1000,
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -86,6 +94,41 @@ export function PredictionFilters({ filters, onChange }: Props) {
         <Clock className="w-3 h-3" />
         {filters.upcoming_only ? "Upcoming" : "All Matches"}
       </button>
+
+      {/* League picker */}
+      {leagues && leagues.length > 0 && (
+        <div className="flex items-center gap-2 w-full border-t border-surface-border pt-3 mt-1">
+          <Trophy className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-xs text-muted-foreground flex-shrink-0">League:</span>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onChange({ ...filters, league_id: undefined, offset: 0 })}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-medium border transition-all",
+                filters.league_id === undefined
+                  ? "bg-neon-green/20 text-neon-green border-neon-green/30"
+                  : "bg-surface-elevated text-muted-foreground border-surface-border hover:text-foreground"
+              )}
+            >
+              All
+            </button>
+            {leagues.map((league) => (
+              <button
+                key={league.id}
+                onClick={() => onChange({ ...filters, league_id: league.id, offset: 0 })}
+                className={cn(
+                  "px-3 py-1 rounded-lg text-xs font-medium border transition-all",
+                  filters.league_id === league.id
+                    ? "bg-neon-green/20 text-neon-green border-neon-green/30"
+                    : "bg-surface-elevated text-muted-foreground border-surface-border hover:text-foreground"
+                )}
+              >
+                {league.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

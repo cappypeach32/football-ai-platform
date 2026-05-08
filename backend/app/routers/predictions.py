@@ -118,7 +118,8 @@ async def get_prediction(
     return pred
 
 
-@router.get("/{prediction_id}/analysis", response_model=MatchAnalysisResponse)async def get_match_analysis(
+@router.get("/{prediction_id}/analysis", response_model=MatchAnalysisResponse)
+async def get_match_analysis(
     prediction_id: int,
     db: AsyncSession = Depends(get_db),
 ):

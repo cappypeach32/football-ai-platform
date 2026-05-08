@@ -10,7 +10,7 @@ import structlog
 
 from app.config import settings
 from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
-from app.routers import auth, matches, predictions, teams, live, analytics, backtest, admin, subscriptions
+from app.routers import auth, matches, predictions, teams, live, analytics, backtest, admin, subscriptions, leagues
 from app.websockets.manager import ws_manager
 from app.websockets.espn_poller import espn_poll_loop
 
@@ -70,6 +70,7 @@ app.include_router(analytics.router,     prefix="/api/v1/analytics",      tags=[
 app.include_router(backtest.router,      prefix="/api/v1/backtest",       tags=["Backtest"])
 app.include_router(subscriptions.router, prefix="/api/v1/subscriptions",  tags=["Subscriptions"])
 app.include_router(admin.router,         prefix="/api/v1/admin",          tags=["Admin"])
+app.include_router(leagues.router,       prefix="/api/v1/leagues",         tags=["Leagues"])
 
 # ─── WebSocket ────────────────────────────────
 from app.websockets.live_handler import router as ws_router

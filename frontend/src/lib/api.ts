@@ -1,4 +1,3 @@
-// Re-exports from src/services/ — all existing imports continue to work unchanged.
 export { apiClient } from "@/services/apiClient";
 export { authService as authApi } from "@/services/authService";
 export { predictionsService as predictionsApi } from "@/services/predictionsService";
@@ -6,3 +5,4 @@ export { matchesService as matchesApi, teamsService as teamsApi } from "@/servic
 export { analyticsService as analyticsApi } from "@/services/analyticsService";
 export { backtestService as backtestApi } from "@/services/backtestService";
 export { adminService as adminApi } from "@/services/adminService";
+export { leaguesService as leaguesApi } from "@/services/leaguesService";
