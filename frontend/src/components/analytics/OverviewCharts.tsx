@@ -3,9 +3,14 @@
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Target, Zap } from "lucide-react";
 
-interface Props { overview: { total_predictions: number; overall_accuracy: number; value_bets_roi: number; total_matches: number } }
+interface Props { overview: { total_predictions: number; overall_accuracy: number; value_bets_roi: number; overall_roi?: number; resolved_bets?: number; total_matches: number } }
 
 export function OverviewCharts({ overview }: Props) {
+  // Use overall_roi if available (from profit_loss data), fallback to value_bets_roi
+  const displayRoi = overview.overall_roi ?? overview.value_bets_roi;
+  const roiLabel = `${displayRoi >= 0 ? "+" : ""}${displayRoi.toFixed(1)}%`;
+  const roiColor = displayRoi > 0 ? "text-neon-green" : displayRoi < 0 ? "text-red-400" : "text-muted-foreground";
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 space-y-3 md:col-span-2">
@@ -14,7 +19,7 @@ export function OverviewCharts({ overview }: Props) {
           {[
             { label: "Accuracy", value: `${(overview.overall_accuracy * 100).toFixed(1)}%`, color: "text-neon-green" },
             { label: "Predictions", value: overview.total_predictions.toLocaleString(), color: "text-neon-blue" },
-            { label: "ROI", value: `${overview.value_bets_roi >= 0 ? "+" : ""}${overview.value_bets_roi.toFixed(1)}%`, color: overview.value_bets_roi >= 0 ? "text-neon-green" : "text-red-400" },
+            { label: "ROI", value: roiLabel, color: roiColor },
             { label: "Matches", value: overview.total_matches.toLocaleString(), color: "text-neon-purple" },
           ].map((s) => (
             <div key={s.label} className="space-y-1">

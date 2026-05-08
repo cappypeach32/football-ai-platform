@@ -190,7 +190,7 @@ class PredictionEngine:
         risk = self._risk_score(confidence, features)
 
         # ── 8. Value bet detection ────────────────────────────────────────────
-        recommended, is_value = self._value_detection(p_hw, p_d, p_aw, match)
+        recommended, is_value = self._value_detection(p_hw, p_d, p_aw, match, confidence)
 
         # ── 9. AI narrative ───────────────────────────────────────────────────
         summary, tactical, key_factors = self._generate_narrative(
@@ -379,7 +379,7 @@ class PredictionEngine:
     # ── Value detection ───────────────────────────────────────────────────────
 
     def _value_detection(
-        self, hw: float, d: float, aw: float, match: Any
+        self, hw: float, d: float, aw: float, match: Any, confidence: float = 50.0
     ) -> tuple[str | None, bool]:
         best_prob = max(hw, d, aw)
         if best_prob == hw:
@@ -391,8 +391,14 @@ class PredictionEngine:
 
         is_value = False
         if market_odds and best_prob > 0:
+            # Real odds available: check if model probability beats implied probability by ≥5%
             implied = 1.0 / market_odds
             if best_prob > implied * 1.05:
+                is_value = True
+        else:
+            # No market odds: use model-based value detection
+            # Flag as value bet if best outcome prob >= 52% AND confidence >= 60
+            if best_prob >= 0.52 and confidence >= 60:
                 is_value = True
 
         return recommended, is_value

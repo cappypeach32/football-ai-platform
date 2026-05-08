@@ -8,11 +8,13 @@ interface Props {
     total_predictions: number;
     overall_accuracy: number;
     value_bets_roi: number;
+    overall_roi?: number;
     total_matches: number;
   };
 }
 
 export function StatsOverviewBar({ overview }: Props) {
+  const displayRoi = overview.overall_roi ?? overview.value_bets_roi;
   const stats = [
     {
       label: "Total Predictions",
@@ -30,10 +32,10 @@ export function StatsOverviewBar({ overview }: Props) {
     },
     {
       label: "Value Bet ROI",
-      value: `${overview.value_bets_roi >= 0 ? "+" : ""}${overview.value_bets_roi.toFixed(1)}%`,
+      value: `${displayRoi >= 0 ? "+" : ""}${displayRoi.toFixed(1)}%`,
       icon: Zap,
-      color: overview.value_bets_roi >= 0 ? "text-neon-green" : "text-red-400",
-      bg: overview.value_bets_roi >= 0 ? "bg-neon-green/10" : "bg-red-500/10",
+      color: displayRoi >= 0 ? "text-neon-green" : "text-red-400",
+      bg: displayRoi >= 0 ? "bg-neon-green/10" : "bg-red-500/10",
     },
     {
       label: "Matches Analysed",

@@ -15,11 +15,34 @@ class AnalyticsService:
         ) or 0
         accuracy = correct / total_preds if total_preds else 0
 
+        # ROI: sum of profit_loss / number of resolved bets * 100
+        # Uses all predictions with recorded profit_loss (1-unit staking)
+        pl_result = await self.db.execute(
+            select(func.sum(Prediction.profit_loss), func.count(Prediction.id))
+            .where(Prediction.profit_loss.isnot(None))
+        )
+        pl_row = pl_result.one()
+        total_pl = pl_row[0] or 0.0
+        resolved_bets = pl_row[1] or 0
+        roi = round((total_pl / resolved_bets) * 100, 2) if resolved_bets > 0 else 0.0
+
+        # Value bets ROI (subset)
+        vb_result = await self.db.execute(
+            select(func.sum(Prediction.profit_loss), func.count(Prediction.id))
+            .where(Prediction.value_bet == True, Prediction.profit_loss.isnot(None))
+        )
+        vb_row = vb_result.one()
+        vb_pl = vb_row[0] or 0.0
+        vb_count = vb_row[1] or 0
+        vb_roi = round((vb_pl / vb_count) * 100, 2) if vb_count > 0 else roi  # fall back to overall ROI
+
         return {
             "total_matches": total_matches,
             "total_predictions": total_preds,
             "overall_accuracy": round(accuracy, 4),
-            "value_bets_roi": 0.0,
+            "value_bets_roi": vb_roi,
+            "overall_roi": roi,
+            "resolved_bets": resolved_bets,
             "top_leagues": [],
             "accuracy_by_market": {},
             "recent_form": [],
