@@ -315,3 +315,19 @@ async def ingest_date_range(days_back: int = Query(60, ge=1, le=365), db: AsyncS
     await db.commit()
     reconcile = await BacktestService(db).reconcile_results()
     return {"ingested_days": len(ingest_results), "predictions_created": preds_created, "reconcile": reconcile}
+
+
+@router.post("/refresh-odds")
+async def refresh_odds(
+    hours_ahead: int = Query(72, ge=1, le=168, description="Look-ahead window in hours"),
+    _: User = Depends(get_current_user),
+):
+    """
+    Refresh 1X2 odds for all upcoming predictions.
+
+    Uses The Odds API (multi-bookmaker, best accuracy) when ODDS_API_KEY is set,
+    otherwise relies on ESPN pickcenter odds fetched lazily per-match.
+    """
+    from app.data_engine.pipeline import refresh_odds_for_upcoming
+    result = await refresh_odds_for_upcoming(hours_ahead=hours_ahead)
+    return result

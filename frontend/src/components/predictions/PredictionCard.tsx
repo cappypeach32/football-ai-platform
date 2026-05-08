@@ -147,6 +147,24 @@ export function PredictionCard({ prediction: p, compact }: Props) {
           <ProbRow label={p.match.away_team.short_name ?? "Away"} prob={p.away_win_prob} color="bg-neon-blue" glowColor="rgba(0,212,255,0.5)" />
         </div>
 
+        {/* Odds row — shown only when real odds are available */}
+        {!compact && (p.odds_home || p.odds_draw || p.odds_away) && (
+          <div className="flex items-center justify-between mb-3 px-1">
+            {[
+              { label: p.match.home_team.short_name ?? "H", odds: p.odds_home, color: "text-neon-green" },
+              { label: "D", odds: p.odds_draw, color: "text-neon-yellow" },
+              { label: p.match.away_team.short_name ?? "A", odds: p.odds_away, color: "text-neon-blue" },
+            ].map(({ label, odds, color }) => (
+              <div key={label} className="flex-1 text-center">
+                <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
+                <p className={`text-sm font-bold tabular-nums font-mono ${odds ? color : "text-muted-foreground/40"}`}>
+                  {odds ? odds.toFixed(2) : "—"}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Footer badges */}
         {!compact && (
           <div className="flex items-center gap-2 flex-wrap">

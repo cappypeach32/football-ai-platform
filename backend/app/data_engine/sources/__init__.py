@@ -621,3 +621,162 @@ class APIFootballSource:
 
 
 api_football = APIFootballSource()
+
+
+# ── The Odds API source ───────────────────────────────────────────────────────
+# https://the-odds-api.com  — free tier: 500 req/month
+# Set ODDS_API_KEY in .env to activate. Falls back to ESPN pickcenter when unset.
+
+_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
+
+# ESPN league slug → The Odds API sport key
+_ODDS_SPORT_MAP: dict[str, str] = {
+    "ENG.1":          "soccer_epl",
+    "ENG.2":          "soccer_efl_champ",
+    "ESP.1":          "soccer_spain_la_liga",
+    "GER.1":          "soccer_germany_bundesliga",
+    "ITA.1":          "soccer_italy_serie_a",
+    "FRA.1":          "soccer_france_ligue_one",
+    "POR.1":          "soccer_portugal_primeira_liga",
+    "NED.1":          "soccer_netherlands_eredivisie",
+    "UEFA.CHAMPIONS": "soccer_uefa_champs_league",
+    "UEFA.EUROPA":    "soccer_uefa_europa_league",
+}
+
+# Preferred bookmaker priority order (EU-facing)
+_PREFERRED_BOOKS = ["bet365", "unibet", "williamhill", "betfair", "pinnacle", "draftkings"]
+
+
+class OddsAPISource:
+    """
+    The Odds API v4 — aggregates odds from 40+ bookmakers.
+
+    Returns decimal 1X2 odds for upcoming matches.
+    Gracefully returns empty when ODDS_API_KEY is not set.
+
+    Free tier usage: one call per league per day = ~9 calls/day = ~270/month.
+    Well within the 500 req/month free limit with aggressive caching.
+    """
+
+    def __init__(self) -> None:
+        self._client: httpx.AsyncClient | None = None
+
+    def _ensure_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=httpx.Timeout(10.0),
+                headers={"User-Agent": "FootballAI/1.0"},
+            )
+        return self._client
+
+    async def fetch_league_odds(
+        self, league_slug: str, api_key: str
+    ) -> list[dict]:
+        """
+        Fetch upcoming 1X2 odds for all matches in a league.
+
+        Returns list of dicts:
+            {
+                event_id: str,        # The Odds API event id
+                home_team: str,
+                away_team: str,
+                commence_time: str,   # ISO 8601
+                home: float | None,   # best decimal odds
+                draw: float | None,
+                away: float | None,
+                bookmaker: str,       # which book the best odds came from
+            }
+        """
+        sport_key = _ODDS_SPORT_MAP.get(league_slug)
+        if not sport_key or not api_key:
+            return []
+
+        client = self._ensure_client()
+        try:
+            r = await client.get(
+                f"{_ODDS_API_BASE}/sports/{sport_key}/odds/",
+                params={
+                    "apiKey": api_key,
+                    "regions": "eu,uk",
+                    "markets": "h2h",
+                    "oddsFormat": "decimal",
+                    "daysFrom": 7,
+                },
+            )
+            remaining = r.headers.get("x-requests-remaining", "?")
+            logger.info("OddsAPI %s: status=%d remaining=%s", league_slug, r.status_code, remaining)
+
+            if r.status_code == 401:
+                logger.warning("OddsAPI: invalid API key")
+                return []
+            if r.status_code == 429:
+                logger.warning("OddsAPI: quota exceeded")
+                return []
+            if r.status_code != 200:
+                logger.warning("OddsAPI: HTTP %d", r.status_code)
+                return []
+
+            events = r.json()
+            results: list[dict] = []
+            for ev in events:
+                home_odds, draw_odds, away_odds, best_book = self._extract_best_odds(ev)
+                results.append({
+                    "event_id":      ev.get("id"),
+                    "home_team":     ev.get("home_team"),
+                    "away_team":     ev.get("away_team"),
+                    "commence_time": ev.get("commence_time"),
+                    "home":          home_odds,
+                    "draw":          draw_odds,
+                    "away":          away_odds,
+                    "bookmaker":     best_book,
+                })
+            return results
+
+        except Exception as exc:
+            logger.warning("OddsAPI fetch_league_odds failed: %s", exc)
+            return []
+
+    def _extract_best_odds(self, event: dict) -> tuple[float | None, float | None, float | None, str]:
+        """
+        Pick best available 1X2 odds across bookmakers.
+        Priority: preferred books first, then highest home odds as tiebreak.
+        """
+        bookmakers = event.get("bookmakers", [])
+        if not bookmakers:
+            return None, None, None, ""
+
+        # Sort: preferred books first
+        def book_priority(b: dict) -> int:
+            key = b.get("key", "")
+            try:
+                return _PREFERRED_BOOKS.index(key)
+            except ValueError:
+                return len(_PREFERRED_BOOKS)
+
+        bookmakers_sorted = sorted(bookmakers, key=book_priority)
+
+        for bm in bookmakers_sorted:
+            for market in bm.get("markets", []):
+                if market.get("key") != "h2h":
+                    continue
+                outcomes = {o["name"]: o["price"] for o in market.get("outcomes", [])}
+                home = outcomes.get(event.get("home_team"))
+                away = outcomes.get(event.get("away_team"))
+                draw = outcomes.get("Draw")
+                if home and away:
+                    return (
+                        round(home, 3),
+                        round(draw, 3) if draw else None,
+                        round(away, 3),
+                        bm.get("key", ""),
+                    )
+
+        return None, None, None, ""
+
+    async def aclose(self) -> None:
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
+
+odds_api = OddsAPISource()

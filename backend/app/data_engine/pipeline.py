@@ -569,3 +569,128 @@ async def refresh_match_odds(match: Match, league_slug: str, db: AsyncSession) -
         logger.info("odds_refreshed", match_id=match.id, odds=odds)
 
     return updated
+
+
+# ── The Odds API bulk refresh ─────────────────────────────────────────────────
+
+async def refresh_odds_for_upcoming(hours_ahead: int = 72) -> dict:
+    """
+    Refresh 1X2 odds for all upcoming predictions.
+
+    Strategy:
+      1. If ODDS_API_KEY is set → use The Odds API (best coverage, multi-book).
+         One call per league → very quota-efficient.
+      2. Otherwise → skip (ESPN pickcenter odds are fetched lazily per-match
+         when the analysis endpoint is hit).
+
+    Returns summary dict: {updated, skipped, errors, quota_remaining}
+    """
+    from app.models import Prediction
+    from app.data_engine.sources import odds_api
+    from app.config import settings
+    from datetime import timedelta
+
+    api_key = getattr(settings, "ODDS_API_KEY", "")
+    if not api_key:
+        logger.info("odds_refresh_skipped: ODDS_API_KEY not configured")
+        return {"updated": 0, "skipped": 0, "errors": 0, "message": "ODDS_API_KEY not set"}
+
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(hours=hours_ahead)
+    summary = {"updated": 0, "skipped": 0, "errors": 0, "quota_remaining": None}
+
+    async with AsyncSessionLocal() as db:
+        # Load all upcoming matches with predictions, grouped by league
+        q = (
+            select(Match)
+            .join(Match.league)
+            .options(
+                selectinload(Match.home_team),
+                selectinload(Match.away_team),
+                selectinload(Match.league),
+            )
+            .where(
+                Match.match_date >= now,
+                Match.match_date <= cutoff,
+                Match.status == MatchStatus.SCHEDULED,
+            )
+        )
+        result = await db.execute(q)
+        matches = result.scalars().all()
+
+        if not matches:
+            return {**summary, "message": "No upcoming matches found"}
+
+        # Group by league slug for efficient API usage (1 call per league)
+        from collections import defaultdict
+        by_league: dict[str, list[Match]] = defaultdict(list)
+        for m in matches:
+            slug = m.league.external_id or ""
+            if slug:
+                by_league[slug].append(m)
+
+        for league_slug, league_matches in by_league.items():
+            try:
+                # One API call for the whole league
+                cache_key = f"odds_api:league:{league_slug}"
+                events = await cache.get(cache_key)
+                if events is None:
+                    events = await odds_api.fetch_league_odds(league_slug, api_key)
+                    if events:
+                        await cache.set(cache_key, events, ttl=3600)  # 1 hr cache
+
+                if not events:
+                    summary["skipped"] += len(league_matches)
+                    continue
+
+                # Build lookup: (home_team_lower, away_team_lower) → odds
+                odds_lookup: dict[tuple, dict] = {}
+                for ev in events:
+                    key = (
+                        ev.get("home_team", "").lower().strip(),
+                        ev.get("away_team", "").lower().strip(),
+                    )
+                    odds_lookup[key] = ev
+
+                for match in league_matches:
+                    home_lower = match.home_team.name.lower().strip()
+                    away_lower = match.away_team.name.lower().strip()
+                    ev_odds = odds_lookup.get((home_lower, away_lower))
+
+                    if not ev_odds or not ev_odds.get("home"):
+                        summary["skipped"] += 1
+                        continue
+
+                    # Fetch prediction for this match
+                    pred_result = await db.execute(
+                        select(Prediction).where(Prediction.match_id == match.id)
+                    )
+                    pred = pred_result.scalar_one_or_none()
+                    if not pred:
+                        summary["skipped"] += 1
+                        continue
+
+                    updated = False
+                    for field_name, key in (
+                        ("odds_home", "home"),
+                        ("odds_draw", "draw"),
+                        ("odds_away", "away"),
+                    ):
+                        val = ev_odds.get(key)
+                        if val is not None and getattr(pred, field_name) != val:
+                            setattr(pred, field_name, val)
+                            updated = True
+
+                    if updated:
+                        summary["updated"] += 1
+                    else:
+                        summary["skipped"] += 1
+
+            except Exception as exc:
+                logger.error("odds_refresh_error league=%s: %s", league_slug, exc)
+                summary["errors"] += 1
+
+        await db.commit()
+
+    logger.info("odds_refresh_complete", **summary)
+    return summary
