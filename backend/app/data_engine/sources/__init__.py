@@ -434,6 +434,30 @@ class FPLSource:
 
         position_map = {et["id"]: et["singular_name"] for et in data.get("element_types", [])}
         transfer_kw = {"loan", "joined", "released", "terminated", "transfer"}
+
+        import re
+        from datetime import date, datetime
+
+        _RETURN_DATE_RE = re.compile(r"Expected back (\d{1,2} \w{3})", re.IGNORECASE)
+
+        def _is_stale(news: str) -> bool:
+            """Return True if the expected return date is already in the past (>7 days ago)."""
+            m = _RETURN_DATE_RE.search(news)
+            if not m:
+                return False
+            try:
+                # FPL omits the year; assume current year, roll to next if it would be far future
+                today = date.today()
+                raw = m.group(1) + f" {today.year}"
+                expected = datetime.strptime(raw, "%d %b %Y").date()
+                # If parsed date is more than 6 months in the future, it belongs to the previous year
+                if (expected - today).days > 180:
+                    expected = expected.replace(year=today.year - 1)
+                # Stale if more than 7 days overdue
+                return (today - expected).days > 7
+            except ValueError:
+                return False
+
         results: list[dict] = []
         for p in data.get("elements", []):
             if p["team"] != team_id:
@@ -448,6 +472,10 @@ class FPLSource:
                 continue
             # Only include real injury/doubt/suspension
             if status not in ("i", "d", "s"):
+                continue
+            # Skip stale records where expected return date has already passed
+            if _is_stale(news):
+                logger.debug("FPL: skipping stale injury record for %s ('%s')", p.get("web_name"), news)
                 continue
             first = p.get("first_name", "")
             last = p.get("second_name", "")
