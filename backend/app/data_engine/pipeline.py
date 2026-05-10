@@ -373,7 +373,7 @@ async def get_team_injuries(team_external_id: str, team_name: str = "", league_s
                 position=item.get("position"),
                 status=item.get("status", "Injured"),
                 detail=item.get("news"),
-                photo_url=None,  # FPL photo CDN blocks server-side requests (403)
+                photo_url=item.get("photo"),  # FPL CDN works fine from the browser (client-side img tag)
                 chance_of_playing=item.get("chance_of_playing"),
             )
             for item in raw
