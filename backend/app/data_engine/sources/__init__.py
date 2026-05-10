@@ -340,6 +340,29 @@ class _EagerESPNSource(ESPNSource):
 espn = _EagerESPNSource()
 
 
+# ── TheSportsDB photo lookup (free, no key, reliable CDN) ────────────────────
+
+_TSDB_SEARCH = "https://www.thesportsdb.com/api/v1/json/3/searchplayers.php"
+_tsdb_photo_cache: dict[str, str | None] = {}  # player name → photo URL
+
+
+async def _tsdb_photo(name: str, client: httpx.AsyncClient) -> str | None:
+    """Return a TheSportsDB thumb URL for a player name, with in-process cache."""
+    key = name.lower().strip()
+    if key in _tsdb_photo_cache:
+        return _tsdb_photo_cache[key]
+    try:
+        r = await client.get(_TSDB_SEARCH, params={"p": name})
+        items = (r.json().get("player") or []) if r.status_code == 200 else []
+        url: str | None = None
+        if items:
+            url = items[0].get("strThumb") or items[0].get("strCutout") or None
+        _tsdb_photo_cache[key] = url
+        return url
+    except Exception:
+        return None
+
+
 # ── Fantasy Premier League source (free, no key, current season only) ─────────
 
 _FPL_BOOTSTRAP = "https://fantasy.premierleague.com/api/bootstrap-static/"
@@ -479,6 +502,7 @@ class FPLSource:
                 continue
             first = p.get("first_name", "")
             last = p.get("second_name", "")
+            fpl_photo_code = p.get("photo", "")
             results.append({
                 "name": f"{first} {last}".strip(),
                 "web_name": p.get("web_name", ""),
@@ -486,8 +510,23 @@ class FPLSource:
                 "status": _FPL_STATUS_MAP.get(status, status),
                 "news": news,
                 "chance_of_playing": p.get("chance_of_playing_next_round"),
-                "photo": f"https://resources.premierleague.com/premierleague/photos/players/110x140/p{p.get('photo','').replace('.jpg','')}.png",
+                # FPL CDN URL kept as fallback (may 403 for non-English players)
+                "_fpl_photo_code": fpl_photo_code,
             })
+
+        # Resolve photos: try TheSportsDB first (reliable), fall back to FPL CDN
+        photo_client = self._ensure_client()
+        photo_tasks = [_tsdb_photo(r["name"], photo_client) for r in results]
+        tsdb_photos = await asyncio.gather(*photo_tasks, return_exceptions=True)
+
+        for r, tsdb_url in zip(results, tsdb_photos):
+            fpl_code = r.pop("_fpl_photo_code", "")
+            if isinstance(tsdb_url, str) and tsdb_url:
+                r["photo"] = tsdb_url
+            elif fpl_code:
+                r["photo"] = f"https://resources.premierleague.com/premierleague/photos/players/110x140/p{fpl_code.replace('.jpg','')}.png"
+            else:
+                r["photo"] = None
 
         return results
 
