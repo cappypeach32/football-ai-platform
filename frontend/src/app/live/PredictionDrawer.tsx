@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { predictionsApi } from "@/lib/api";
+import { predictionsApi, matchesApi } from "@/lib/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TeamLogo } from "@/components/ui/TeamLogo";
-import type { EspnLiveMatch, Prediction } from "@/types";
-import { X, Brain, TrendingUp, AlertTriangle, ExternalLink } from "lucide-react";
+import type { EspnLiveMatch, Prediction, LineupPlayer, TeamLineup } from "@/types";
+import { X, Brain, TrendingUp, AlertTriangle, ExternalLink, Users, ChevronDown, ChevronUp, User } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,77 @@ function ProbBar({ label, prob, color }: { label: string; prob: number; color: s
   );
 }
 
+function PlayerRow({ player }: { player: LineupPlayer }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <div className="flex items-center gap-2 py-1.5 border-b border-surface-border/40 last:border-0">
+      {/* Photo */}
+      <div className="w-7 h-7 rounded-full bg-surface-elevated flex-shrink-0 overflow-hidden flex items-center justify-center">
+        {player.photo_url && !imgFailed ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={player.photo_url}
+            alt={player.name}
+            className="w-full h-full object-cover"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <User className="w-3.5 h-3.5 text-muted-foreground" />
+        )}
+      </div>
+      {/* Jersey */}
+      <span className="text-[11px] font-mono text-muted-foreground w-5 text-center flex-shrink-0">
+        {player.jersey}
+      </span>
+      {/* Name */}
+      <span className="flex-1 text-xs text-foreground truncate">{player.name}</span>
+      {/* Position */}
+      <span className="text-[10px] font-bold text-muted-foreground bg-surface-elevated px-1.5 py-0.5 rounded flex-shrink-0">
+        {player.position}
+      </span>
+    </div>
+  );
+}
+
+function TeamLineupColumn({ side, lineup }: { side: "home" | "away"; lineup: TeamLineup }) {
+  const [showBench, setShowBench] = useState(false);
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="text-center mb-2">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          {side === "home" ? "Home" : "Away"}
+        </span>
+        {lineup.formation && (
+          <div className="mt-0.5 inline-flex items-center gap-1 bg-neon-green/10 border border-neon-green/25 rounded px-2 py-0.5">
+            <span className="text-[11px] font-bold text-neon-green font-mono">{lineup.formation}</span>
+          </div>
+        )}
+      </div>
+      <div>
+        {lineup.starters.map((p, i) => (
+          <PlayerRow key={i} player={p} />
+        ))}
+      </div>
+      {lineup.bench.length > 0 && (
+        <button
+          onClick={() => setShowBench((v) => !v)}
+          className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors w-full"
+        >
+          {showBench ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {showBench ? "Hide bench" : `Bench (${lineup.bench.length})`}
+        </button>
+      )}
+      {showBench && (
+        <div className="mt-1 border-t border-dashed border-surface-border pt-1">
+          {lineup.bench.map((p, i) => (
+            <PlayerRow key={i} player={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PredictionDrawer({
   match,
   onClose,
@@ -36,6 +108,8 @@ export function PredictionDrawer({
   match: EspnLiveMatch;
   onClose: () => void;
 }) {
+  const [showLineups, setShowLineups] = useState(true);
+
   const { data: homeResults, isLoading: loadingHome } = useQuery({
     queryKey: ["pred-by-team", match.home_team, "live"],
     queryFn: () =>
@@ -46,6 +120,15 @@ export function PredictionDrawer({
     queryFn: () =>
       predictionsApi.getByTeam(match.away_team, 20, false).then((r) => r.data as Prediction[]),
     enabled: !homeResults?.length,
+  });
+
+  // Lineup query
+  const { data: lineupData, isLoading: loadingLineup } = useQuery({
+    queryKey: ["lineup", match.league_slug, match.match_external_id],
+    queryFn: () =>
+      matchesApi.getLineup(match.league_slug, match.match_external_id).then((r) => r.data),
+    staleTime: 3 * 60 * 1000,
+    retry: false,
   });
 
   const isLoading = loadingHome || loadingAway;
@@ -295,6 +378,58 @@ export function PredictionDrawer({
               </Link>
             </div>
           )}
+
+          {/* ── Starting Lineups ── */}
+          <div className="glass-card overflow-hidden">
+            <button
+              onClick={() => setShowLineups((v) => !v)}
+              className="flex items-center justify-between w-full p-4 hover:bg-surface-elevated/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-neon-green" />
+                <span className="text-sm font-semibold text-foreground">Starting Lineups</span>
+              </div>
+              {showLineups ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+
+            {showLineups && (
+              <div className="px-4 pb-4">
+                {loadingLineup ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Skeleton key={i} className="h-8 rounded" />
+                    ))}
+                  </div>
+                ) : !lineupData?.home && !lineupData?.away ? (
+                  <div className="text-center py-4 space-y-1">
+                    <Users className="w-6 h-6 text-muted-foreground mx-auto" />
+                    <p className="text-xs text-muted-foreground">
+                      Lineups not yet announced
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60">
+                      Usually confirmed ~60 min before kickoff
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex gap-4">
+                    {lineupData?.home && (
+                      <TeamLineupColumn side="home" lineup={lineupData.home} />
+                    )}
+                    {lineupData?.home && lineupData?.away && (
+                      <div className="w-px bg-surface-border flex-shrink-0" />
+                    )}
+                    {lineupData?.away && (
+                      <TeamLineupColumn side="away" lineup={lineupData.away} />
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </>

@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { EspnLiveResponse } from "@/types";
+import type { EspnLiveResponse, MatchLineup } from "@/types";
 
 export const matchesService = {
   getAll: (params?: Record<string, unknown>) => apiClient.get("/matches/", { params }),
@@ -7,6 +7,8 @@ export const matchesService = {
   getLive: () => apiClient.get("/matches/live"),
   getById: (id: number) => apiClient.get(`/matches/${id}`),
   getEspnLive: () => apiClient.get<EspnLiveResponse>("/live/matches"),
+  getLineup: (leagueSlug: string, eventId: string) =>
+    apiClient.get<MatchLineup>(`/live/lineup/${leagueSlug}/${eventId}`),
 };
 
 export const teamsService = {

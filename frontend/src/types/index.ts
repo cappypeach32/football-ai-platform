@@ -258,6 +258,27 @@ export interface EspnLiveResponse {
   connected_clients: number;
 }
 
+export interface LineupPlayer {
+  name: string;
+  position: string;
+  position_name: string;
+  jersey: string;
+  starter: boolean;
+  photo_url: string | null;
+}
+
+export interface TeamLineup {
+  team: string;
+  formation: string;
+  starters: LineupPlayer[];
+  bench: LineupPlayer[];
+}
+
+export interface MatchLineup {
+  home: TeamLineup | null;
+  away: TeamLineup | null;
+}
+
 export interface LiveUpdate {
   match_id: number;
   minute: number;
