@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { predictionsApi, matchesApi } from "@/lib/api";
 import type { MatchAnalysis, TeamFormEntry, InjuredPlayerInfo, H2HResult, EspnLiveMatch, EspnLiveResponse } from "@/types";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { ConfidenceRing } from "@/components/ui/ConfidenceRing";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
+import { PlayerCardModal } from "@/components/ui/PlayerCardModal";
 import { MatchIntelligencePanel } from "@/components/predictions/MatchIntelligencePanel";
 import { OddsTracker } from "@/components/predictions/OddsTracker";
 // Charts are below-the-fold — lazy loaded to reduce initial bundle
@@ -103,6 +105,8 @@ function FormRow({ entry }: { entry: TeamFormEntry }) {
 }
 
 function InjuryRow({ player }: { player: InjuredPlayerInfo }) {
+  const [showCard, setShowCard] = useState(false);
+
   const statusColor =
     player.status === "suspended" ? "text-red-400 bg-red-500/10 border-red-500/20" :
     player.status === "doubtful"  ? "text-amber-400 bg-amber-400/10 border-amber-400/20" :
@@ -116,34 +120,41 @@ function InjuryRow({ player }: { player: InjuredPlayerInfo }) {
                                        "text-emerald-400";
 
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-surface-border/50 last:border-0">
-      {player.photo_url ? (
-        <PlayerAvatar src={player.photo_url} name={player.name} />
-      ) : (
-        <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center">
-          <Shield className="w-4 h-4 text-muted-foreground" />
+    <>
+      <div
+        className="flex items-center gap-3 py-2 border-b border-surface-border/50 last:border-0 cursor-pointer hover:bg-surface-elevated/40 rounded-lg px-1 -mx-1 transition-colors"
+        onClick={() => setShowCard(true)}
+        title="Click for player details"
+      >
+        {player.photo_url ? (
+          <PlayerAvatar src={player.photo_url} name={player.name} />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center">
+            <Shield className="w-4 h-4 text-muted-foreground" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{player.name}</p>
+          {player.position && <p className="text-xs text-muted-foreground">{player.position}</p>}
         </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{player.name}</p>
-        {player.position && <p className="text-xs text-muted-foreground">{player.position}</p>}
-      </div>
-      <div className="text-right space-y-0.5">
-        <div className="flex items-center justify-end gap-1.5">
-          <span className={cn("text-[10px] font-bold uppercase px-2 py-0.5 rounded border", statusColor)}>
-            {player.status}
-          </span>
-          {player.chance_of_playing !== null && player.chance_of_playing !== undefined && (
-            <span className={cn("text-[10px] font-bold tabular-nums", chanceColor)}>
-              {player.chance_of_playing}%
+        <div className="text-right space-y-0.5">
+          <div className="flex items-center justify-end gap-1.5">
+            <span className={cn("text-[10px] font-bold uppercase px-2 py-0.5 rounded border", statusColor)}>
+              {player.status}
             </span>
+            {player.chance_of_playing !== null && player.chance_of_playing !== undefined && (
+              <span className={cn("text-[10px] font-bold tabular-nums", chanceColor)}>
+                {player.chance_of_playing}%
+              </span>
+            )}
+          </div>
+          {player.detail && (
+            <p className="text-xs text-muted-foreground max-w-[140px] truncate">{player.detail}</p>
           )}
         </div>
-        {player.detail && (
-          <p className="text-xs text-muted-foreground max-w-[140px] truncate">{player.detail}</p>
-        )}
       </div>
-    </div>
+      {showCard && <PlayerCardModal player={player} onClose={() => setShowCard(false)} />}
+    </>
   );
 }
 
