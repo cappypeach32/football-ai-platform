@@ -24,12 +24,13 @@ async def list_predictions(
     value_bets_only: bool = Query(False),
     upcoming_only: bool = Query(True, description="Only return matches scheduled in the future"),
     team_name: str | None = Query(None, description="Filter by home or away team name (case-insensitive)"),
+    from_date: date | None = Query(None, description="Local calendar date floor (YYYY-MM-DD). Prevents yesterday's finished matches from showing after midnight in positive UTC offsets."),
     limit: int = Query(20, le=100),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_db),
 ):
     from app.models import Team
-    from datetime import datetime
+    from datetime import datetime, timedelta, time as dtime
     home_alias = aliased(Team, name="home_t")
     away_alias = aliased(Team, name="away_t")
 
@@ -48,9 +49,15 @@ async def list_predictions(
         .offset(offset)
     )
     if upcoming_only:
-        # Include scheduled matches AND matches that kicked off recently (in-play window: 3h)
-        from datetime import timedelta
-        q = q.where(Match.match_date >= datetime.utcnow() - timedelta(hours=3))
+        # 3-hour lookback for in-play detection, but floored by from_date midnight so
+        # yesterday's finished matches never bleed through for users in UTC+ timezones.
+        in_play_cutoff = datetime.utcnow() - timedelta(hours=3)
+        if from_date:
+            date_floor = datetime.combine(from_date, dtime(0, 0, 0))
+            cutoff = max(in_play_cutoff, date_floor)
+        else:
+            cutoff = in_play_cutoff
+        q = q.where(Match.match_date >= cutoff)
     if league_id:
         q = q.where(Match.league_id == league_id)
     if value_bets_only:
@@ -63,7 +70,6 @@ async def list_predictions(
         ))
         if not upcoming_only:
             # When fetching all (including past), sort closest to now first
-            from sqlalchemy import func
             now_ts = datetime.utcnow().timestamp()
             q = q.order_by(
                 func.abs(func.strftime("%s", Match.match_date) - now_ts),
@@ -74,6 +80,9 @@ async def list_predictions(
     else:
         # Soonest upcoming first, then by confidence within same-day matches
         q = q.order_by(Match.match_date, desc(Prediction.confidence_score))
+
+    result = await db.execute(q)
+    return result.scalars().all()
 
     result = await db.execute(q)
     return result.scalars().all()

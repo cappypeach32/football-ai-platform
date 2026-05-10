@@ -19,13 +19,16 @@ export default function PredictionsPage() {
     offset: 0,
   });
 
-  // Include today's local date in the key so the cache is automatically
-  // invalidated when the calendar date changes (i.e. after midnight).
+  // Local calendar date (YYYY-MM-DD) sent to backend so matches from the
+  // previous UTC day don't bleed through for users in UTC+ timezones.
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
 
   const { data: predictions, isLoading } = useQuery({
     queryKey: ["predictions", filters, today],
-    queryFn: () => predictionsApi.getAll(filters).then((r) => r.data as Prediction[]),
+    queryFn: () =>
+      predictionsApi
+        .getAll({ ...filters, from_date: today })
+        .then((r) => r.data as Prediction[]),
     staleTime: 0,
     refetchInterval: 5 * 60 * 1000,       // re-poll every 5 minutes
     refetchIntervalInBackground: false,    // pause when tab is hidden
