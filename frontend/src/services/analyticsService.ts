@@ -13,4 +13,6 @@ export const analyticsService = {
   getIntelligence: (fromDate?: string) =>
     apiClient.get("/analytics/intelligence", { params: fromDate ? { from_date: fromDate } : {} }),
   getDailySummary: () => apiClient.get("/analytics/daily-summary"),
+  getDailyReport: () => apiClient.get("/analytics/daily-report"),
+  getLeagueIntelligence: (externalId: string) => apiClient.get(`/analytics/leagues/${externalId}/intelligence`),
 };

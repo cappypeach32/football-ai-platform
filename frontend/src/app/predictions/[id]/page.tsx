@@ -21,6 +21,8 @@ import { PlayerCardModal } from "@/components/ui/PlayerCardModal";
 import { MatchIntelligencePanel } from "@/components/predictions/MatchIntelligencePanel";
 import { OddsTracker } from "@/components/predictions/OddsTracker";
 import { InjuryImpactCenter } from "@/components/predictions/InjuryImpactCenter";
+import { ModelTransparencyPanel } from "@/components/predictions/ModelTransparencyPanel";
+import { LeagueIntelligencePanel } from "@/components/predictions/LeagueIntelligencePanel";
 // Charts are below-the-fold — lazy loaded to reduce initial bundle
 const TeamRadarChart = dynamic(
   () => import("@/components/analytics/TeamRadarChart").then((m) => ({ default: m.TeamRadarChart })),
@@ -381,6 +383,14 @@ export default function PredictionDetailPage({ params }: { params: { id: string 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
         <MatchIntelligencePanel analysis={analysis} />
       </motion.div>
+
+      {/* Model Transparency — key factors + ensemble agreement */}
+      <ModelTransparencyPanel prediction={p} />
+
+      {/* League Intelligence — historical stats derived from CSVs */}
+      {m.league.external_id && (
+        <LeagueIntelligencePanel externalId={m.league.external_id} />
+      )}
 
       {/* Odds Tracker */}
       {(p.odds_home || p.odds_draw || p.odds_away) && (

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from app.schemas.football import MatchResponse
 
 
@@ -60,6 +60,31 @@ class PredictionResponse(BaseModel):
     result: str
     model_version: str
     created_at: datetime
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def risk_category(self) -> str:
+        """
+        Derives a human-readable risk category from confidence_score and risk_score.
+        Safe        — high confidence, low risk
+        Balanced    — moderate confidence, moderate risk
+        Aggressive  — low confidence, low risk (value play)
+        High Variance — any scenario with high risk
+        """
+        conf = self.confidence_score
+        risk = self.risk_score
+        agree = self.model_agreement or 0
+        # Spread of 1X2 probs as a volatility proxy
+        probs = sorted([self.home_win_prob, self.draw_prob, self.away_win_prob], reverse=True)
+        spread = probs[0] - probs[1]  # distance between top two outcomes
+
+        if risk >= 60 or spread < 0.12:
+            return "High Variance"
+        if conf >= 62 and risk < 45 and agree >= 2:
+            return "Safe"
+        if conf >= 50 and risk < 55:
+            return "Balanced"
+        return "Aggressive"
 
     model_config = {"from_attributes": True}
 

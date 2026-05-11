@@ -25,6 +25,65 @@ async def league_stats(db: AsyncSession = Depends(get_db)):
     return await service.get_league_stats()
 
 
+@router.get("/leagues/{external_id}/intelligence")
+async def league_intelligence(external_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Returns pre-computed league intelligence stats derived from historical CSV data.
+    Also includes qualitative insights.
+    """
+    result = await db.execute(
+        sa.select(League).where(func.lower(League.external_id) == external_id.lower())
+    )
+    league = result.scalar_one_or_none()
+    if league is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"League '{external_id}' not found")
+
+    avg = league.avg_goals_per_game
+    draw = league.draw_rate
+    btts = league.btts_rate
+    hw   = league.home_win_rate
+    var  = league.goals_variance
+
+    # Qualitative insights
+    insights = []
+    if avg >= 3.0:
+        insights.append({"icon": "⚽", "text": f"High-scoring league: {avg:.2f} goals/game on average", "type": "positive"})
+    elif avg <= 2.3:
+        insights.append({"icon": "🔒", "text": f"Low-scoring league: {avg:.2f} goals/game — under bets favoured", "type": "warning"})
+
+    if draw >= 0.28:
+        insights.append({"icon": "⚖️", "text": f"Draw-heavy: {draw*100:.1f}% of games end level — draw value plays exist", "type": "info"})
+    elif draw <= 0.22:
+        insights.append({"icon": "🎯", "text": f"Low draw rate ({draw*100:.1f}%) — back decisive outcomes", "type": "info"})
+
+    if btts >= 0.58:
+        insights.append({"icon": "🔥", "text": f"BTTS lands {btts*100:.1f}% of games — high BTTS value", "type": "positive"})
+
+    if hw >= 0.48:
+        insights.append({"icon": "🏠", "text": f"Strong home advantage: {hw*100:.1f}% home wins historically", "type": "positive"})
+
+    if var >= 3.0:
+        insights.append({"icon": "📊", "text": "High goal variance — expect unpredictable scorelines", "type": "warning"})
+
+    return {
+        "league_id": league.id,
+        "external_id": league.external_id,
+        "name": league.name,
+        "country": league.country,
+        "seasons_computed": league.seasons_computed,
+        "stats": {
+            "avg_goals_per_game": avg,
+            "draw_rate": draw,
+            "btts_rate": btts,
+            "goals_variance": var,
+            "home_win_rate": hw,
+            "away_win_rate": round(1 - hw - draw, 4),
+        },
+        "insights": insights,
+    }
+
+
 @router.get("/team/{team_id}/form")
 async def team_form(team_id: int, last_n: int = 10, db: AsyncSession = Depends(get_db)):
     from app.services.analytics_service import AnalyticsService
@@ -207,6 +266,108 @@ async def daily_summary(db: AsyncSession = Depends(get_db)):
         "accuracy_today": summary["accuracy"],
         "roi_today": summary["roi"],
         "profit_loss_today": summary["total_profit_loss"],
+    }
+
+
+@router.get("/daily-report")
+async def daily_report(db: AsyncSession = Depends(get_db)):
+    """
+    Rich AI daily briefing:
+    - top 3 highest-confidence picks today
+    - strongest value bet (highest expected value proxy)
+    - high-variance warnings (risk_score >= 60)
+    - quick headline stats
+    """
+    now = datetime.now(timezone.utc)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end   = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    base_q = (
+        select(Prediction)
+        .join(Match)
+        .options(selectinload(Prediction.match).selectinload(Match.home_team),
+                 selectinload(Prediction.match).selectinload(Match.away_team),
+                 selectinload(Prediction.match).selectinload(Match.league))
+        .where(Match.match_date >= day_start, Match.match_date <= day_end)
+    )
+    result = await db.execute(base_q)
+    preds = result.scalars().all()
+
+    def _bet_label(p: Prediction) -> str:
+        bet_map = {"1": p.match.home_team.name, "X": "Draw", "2": p.match.away_team.name}
+        return bet_map.get(str(p.recommended_bet), str(p.recommended_bet or "—"))
+
+    def _pick_odds(p: Prediction) -> float | None:
+        bet_map = {"1": p.odds_home, "X": p.odds_draw, "2": p.odds_away}
+        return bet_map.get(str(p.recommended_bet))
+
+    def _ev(p: Prediction) -> float | None:
+        prob_map = {"1": p.home_win_prob, "X": p.draw_prob, "2": p.away_win_prob}
+        prob = prob_map.get(str(p.recommended_bet))
+        odds = _pick_odds(p)
+        if prob is None or odds is None:
+            return None
+        return round((prob * odds - 1) * 100, 1)
+
+    def _risk_category(p: Prediction) -> str:
+        conf, risk = p.confidence_score, p.risk_score
+        probs = sorted([p.home_win_prob, p.draw_prob, p.away_win_prob], reverse=True)
+        spread = probs[0] - probs[1]
+        if risk >= 60 or spread < 0.12:
+            return "High Variance"
+        if conf >= 62 and risk < 45 and (p.model_agreement or 0) >= 2:
+            return "Safe"
+        if conf >= 50 and risk < 55:
+            return "Balanced"
+        return "Aggressive"
+
+    def _pred_summary(p: Prediction) -> dict:
+        return {
+            "id": p.id,
+            "home": p.match.home_team.name,
+            "away": p.match.away_team.name,
+            "league": p.match.league.name,
+            "match_date": p.match.match_date.isoformat(),
+            "pick": _bet_label(p),
+            "odds": _pick_odds(p),
+            "confidence": round(p.confidence_score, 1),
+            "risk": round(p.risk_score, 1),
+            "risk_category": _risk_category(p),
+            "ev": _ev(p),
+            "model_agreement": p.model_agreement,
+            "value_bet": p.value_bet,
+        }
+
+    # Top-3 confidence picks
+    top_picks = sorted(preds, key=lambda x: x.confidence_score, reverse=True)[:3]
+
+    # Strongest value bet (highest positive EV)
+    value_preds = [p for p in preds if p.value_bet]
+    strongest_value = None
+    if value_preds:
+        best = max(value_preds, key=lambda x: (_ev(x) or -999))
+        strongest_value = _pred_summary(best)
+
+    # High-variance warnings
+    high_variance = [_pred_summary(p) for p in preds
+                     if p.risk_score >= 60 or _risk_category(p) == "High Variance"]
+    high_variance.sort(key=lambda x: x["risk"], reverse=True)
+
+    # Headline stats
+    all_evs = [_ev(p) for p in preds if _ev(p) is not None]
+    avg_ev = round(sum(all_evs) / len(all_evs), 1) if all_evs else None
+    model_agreement_full = sum(1 for p in preds if (p.model_agreement or 0) >= 3)
+
+    return {
+        "generated_at": now.isoformat(),
+        "total_predictions": len(preds),
+        "value_bets_count": len(value_preds),
+        "high_variance_count": len(high_variance),
+        "model_full_agreement_count": model_agreement_full,
+        "avg_expected_value": avg_ev,
+        "top_confidence_picks": [_pred_summary(p) for p in top_picks],
+        "strongest_value_bet": strongest_value,
+        "high_variance_warnings": high_variance[:5],
     }
 
 

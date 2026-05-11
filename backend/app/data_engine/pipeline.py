@@ -565,8 +565,20 @@ async def refresh_match_odds(match: Match, league_slug: str, db: AsyncSession) -
             updated = True
 
     if updated:
+        # Recompute value_bet with the fresh odds + stored probabilities
+        _new_value = False
+        for _prob, _odds in [
+            (pred.home_win_prob, pred.odds_home),
+            (pred.draw_prob,     pred.odds_draw),
+            (pred.away_win_prob, pred.odds_away),
+        ]:
+            if _odds and _prob and _prob > (1.0 / _odds) * 1.03:
+                _new_value = True
+                break
+        pred.value_bet = _new_value
+
         await db.commit()
-        logger.info("odds_refreshed", match_id=match.id, odds=odds)
+        logger.info("odds_refreshed", match_id=match.id, odds=odds, value_bet=_new_value)
 
     return updated
 
@@ -715,6 +727,17 @@ async def refresh_odds_for_upcoming(hours_ahead: int = 72) -> dict:
                             updated = True
 
                     if updated:
+                        # Recompute value_bet with the fresh odds
+                        _new_value = False
+                        for _prob, _odds in [
+                            (pred.home_win_prob, pred.odds_home),
+                            (pred.draw_prob,     pred.odds_draw),
+                            (pred.away_win_prob, pred.odds_away),
+                        ]:
+                            if _odds and _prob and _prob > (1.0 / _odds) * 1.03:
+                                _new_value = True
+                                break
+                        pred.value_bet = _new_value
                         summary["updated"] += 1
                     else:
                         summary["skipped"] += 1

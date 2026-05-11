@@ -12,6 +12,7 @@ export interface Team {
 
 export interface League {
   id: number;
+  external_id: string | null;
   name: string;
   country: string;
   logo_url: string | null;
@@ -57,6 +58,7 @@ export interface Prediction {
   odds_away: number | null;
   model_agreement: number | null;
   ah_line: number | null;
+  risk_category: "Safe" | "Balanced" | "Aggressive" | "High Variance";
   result: "win" | "draw" | "loss" | "pending";
   is_correct: boolean | null;
   profit_loss: number | null;

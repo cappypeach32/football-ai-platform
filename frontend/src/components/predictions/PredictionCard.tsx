@@ -151,7 +151,7 @@ export function PredictionCard({ prediction: p, compact }: Props) {
 
         {/* AI Pick banner */}
         <div className={cn(
-          "rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3",
+          "rounded-xl px-4 py-3 mb-3 flex items-center justify-between gap-3",
           isValue ? "bg-neon-green/10 border border-neon-green/20" : "bg-surface-elevated border border-surface-border"
         )}>
           <div>
@@ -174,6 +174,33 @@ export function PredictionCard({ prediction: p, compact }: Props) {
             </motion.div>
           )}
         </div>
+
+        {/* Risk Category badge */}
+        {p.risk_category && (
+          <div className="flex items-center gap-2 mb-4">
+            <span className={cn(
+              "inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border",
+              p.risk_category === "Safe"          ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" :
+              p.risk_category === "Balanced"      ? "text-sky-400 bg-sky-500/10 border-sky-500/20" :
+              p.risk_category === "Aggressive"    ? "text-amber-400 bg-amber-400/10 border-amber-400/20" :
+                                                    "text-red-400 bg-red-500/10 border-red-500/20"
+            )}>
+              <span className={cn("w-1.5 h-1.5 rounded-full",
+                p.risk_category === "Safe"       ? "bg-emerald-400" :
+                p.risk_category === "Balanced"   ? "bg-sky-400" :
+                p.risk_category === "Aggressive" ? "bg-amber-400" :
+                                                   "bg-red-400"
+              )} />
+              {p.risk_category}
+            </span>
+            <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wide">
+              {p.risk_category === "Safe"          ? "High confidence, low risk" :
+               p.risk_category === "Balanced"      ? "Moderate confidence, moderate risk" :
+               p.risk_category === "Aggressive"    ? "Low confidence, value play" :
+                                                     "High volatility — proceed with caution"}
+            </span>
+          </div>
+        )}
 
         {/* 4-stat grid */}
         <div className="grid grid-cols-4 gap-2 mb-4">

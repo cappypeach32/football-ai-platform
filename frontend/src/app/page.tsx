@@ -8,6 +8,7 @@ import { StatsOverviewBar } from "@/components/dashboard/StatsOverviewBar";
 import { AIAlertsBanner } from "@/components/dashboard/AIAlertsBanner";
 import { IntelligenceFeed } from "@/components/dashboard/IntelligenceFeed";
 import { DailyOverviewCard } from "@/components/dashboard/DailyOverviewCard";
+import { DailyBriefingCard } from "@/components/dashboard/DailyBriefingCard";
 import { HeroPickCard, HeroPickCardSkeleton } from "@/components/dashboard/HeroPickCard";
 import type { Prediction } from "@/types";
 import Link from "next/link";
@@ -73,10 +74,13 @@ export default function DashboardPage() {
         <HeroPickCard prediction={heroPred} />
       ) : null}
 
-      {/* Stats + Daily Overview */}
+      {/* Stats + Daily Overview + AI Briefing */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
         <div className="xl:col-span-3">
           {overview && <StatsOverviewBar overview={overview} />}
+          <div className="mt-4">
+            <DailyBriefingCard />
+          </div>
         </div>
         <div className="xl:col-span-1">
           <DailyOverviewCard daily={daily} />

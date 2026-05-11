@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class LeagueResponse(BaseModel):
     id: int
+    external_id: str | None = None
     name: str
     country: str
     logo_url: str | None

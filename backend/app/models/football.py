@@ -17,6 +17,14 @@ class League(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     tier: Mapped[int] = mapped_column(Integer, default=1)
 
+    # League Intelligence — computed from historical CSVs
+    avg_goals_per_game: Mapped[float] = mapped_column(Float, default=0.0)
+    draw_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    btts_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    goals_variance: Mapped[float] = mapped_column(Float, default=0.0)
+    home_win_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    seasons_computed: Mapped[str | None] = mapped_column(String(255))
+
     teams: Mapped[list["Team"]] = relationship("Team", back_populates="league")
     matches: Mapped[list["Match"]] = relationship("Match", back_populates="league")
 
