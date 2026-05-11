@@ -49,76 +49,131 @@ interface InjuryImpactResponse {
   away: TeamInjuryImpact | null;
 }
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ─── Design tokens ────────────────────────────────────────────────────────────
 
 const LEVEL = {
-  LOW:      { label: "LOW",      text: "text-emerald-400", border: "border-emerald-500/30" },
-  MEDIUM:   { label: "MEDIUM",   text: "text-amber-400",   border: "border-amber-400/30"   },
-  HIGH:     { label: "HIGH",     text: "text-orange-400",  border: "border-orange-400/30"  },
-  CRITICAL: { label: "CRITICAL", text: "text-red-400",     border: "border-red-500/30"     },
+  LOW: {
+    label:       "LOW",
+    text:        "text-emerald-400",
+    subtext:     "text-emerald-400/60",
+    border:      "border-emerald-500/20",
+    gradient:    "from-emerald-500/8 to-transparent",
+    badgeBg:     "bg-emerald-500/10",
+    dot:         "bg-emerald-400",
+    glow:        "shadow-emerald-500/5",
+  },
+  MEDIUM: {
+    label:       "MEDIUM",
+    text:        "text-amber-400",
+    subtext:     "text-amber-400/60",
+    border:      "border-amber-400/20",
+    gradient:    "from-amber-400/8 to-transparent",
+    badgeBg:     "bg-amber-400/10",
+    dot:         "bg-amber-400",
+    glow:        "shadow-amber-400/5",
+  },
+  HIGH: {
+    label:       "HIGH",
+    text:        "text-orange-400",
+    subtext:     "text-orange-400/60",
+    border:      "border-orange-400/20",
+    gradient:    "from-orange-400/8 to-transparent",
+    badgeBg:     "bg-orange-400/10",
+    dot:         "bg-orange-400",
+    glow:        "shadow-orange-400/5",
+  },
+  CRITICAL: {
+    label:       "CRITICAL",
+    text:        "text-red-400",
+    subtext:     "text-red-400/60",
+    border:      "border-red-500/20",
+    gradient:    "from-red-500/10 to-transparent",
+    badgeBg:     "bg-red-500/10",
+    dot:         "bg-red-400",
+    glow:        "shadow-red-500/8",
+  },
 } as const;
 
-// ─── Stat cell ────────────────────────────────────────────────────────────────
+// ─── Metric block ─────────────────────────────────────────────────────────────
 
-function StatCell({
+function MetricBlock({
   label,
   value,
   valueClass,
-  sub,
+  note,
 }: {
   label: string;
   value: string;
   valueClass?: string;
-  sub?: string;
+  note?: string;
 }) {
   return (
-    <div className="flex flex-col gap-1 py-3 px-4 border-r border-surface-border/40 last:border-r-0">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">{label}</p>
-      <p className={cn("text-xl font-black tabular-nums leading-none", valueClass ?? "text-foreground")}>{value}</p>
-      {sub && <p className="text-[9px] text-muted-foreground/50 uppercase tracking-wide mt-0.5">{sub}</p>}
-    </div>
+    <motion.div
+      whileHover={{ backgroundColor: "rgba(255,255,255,0.025)" }}
+      className="flex flex-col gap-1.5 px-5 py-4 rounded-lg transition-colors"
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50 leading-none">
+        {label}
+      </p>
+      <p className={cn("text-2xl font-black tabular-nums leading-none", valueClass ?? "text-foreground")}>
+        {value}
+      </p>
+      {note && (
+        <p className="text-[10px] text-muted-foreground/40 leading-none">{note}</p>
+      )}
+    </motion.div>
   );
 }
 
 // ─── Absent player row ────────────────────────────────────────────────────────
 
-function AbsentRow({ player }: { player: AbsentPlayer }) {
+function AbsentRow({ player, index }: { player: AbsentPlayer; index: number }) {
   const posAbbr =
     player.position.includes("Goalkeeper") ? "GK"  :
     player.position.includes("Defender")   ? "DEF" :
     player.position.includes("Midfielder") ? "MID" :
     player.position.includes("Forward")    ? "FWD" : "—";
 
-  const posColor =
-    player.position.includes("Goalkeeper") ? "text-amber-400 bg-amber-400/10" :
-    player.position.includes("Defender")   ? "text-sky-400 bg-sky-400/10"     :
-    player.position.includes("Midfielder") ? "text-violet-400 bg-violet-400/10" :
-    player.position.includes("Forward")    ? "text-rose-400 bg-rose-400/10"   :
+  const posStyle =
+    player.position.includes("Goalkeeper") ? "text-amber-400/80 bg-amber-400/8"    :
+    player.position.includes("Defender")   ? "text-sky-400/80 bg-sky-400/8"         :
+    player.position.includes("Midfielder") ? "text-violet-400/80 bg-violet-400/8"   :
+    player.position.includes("Forward")    ? "text-rose-400/80 bg-rose-400/8"       :
                                              "text-muted-foreground bg-surface-elevated";
 
   const statusLabel =
-    player.status === "Injured"    ? "OUT"   :
-    player.status === "doubtful"   ? "DOUBT" :
-    player.status === "suspended"  ? "SUSP"  : "OUT";
+    player.status === "Injured"   ? "OUT"   :
+    player.status === "doubtful"  ? "DOUBT" :
+    player.status === "suspended" ? "SUSP"  : "OUT";
 
-  const statusColor =
-    player.status === "Injured"   ? "text-red-400 border-red-500/30"     :
-    player.status === "doubtful"  ? "text-amber-400 border-amber-400/30" :
-                                    "text-orange-400 border-orange-400/30";
+  const statusStyle =
+    player.status === "Injured"   ? "text-red-400/80"    :
+    player.status === "doubtful"  ? "text-amber-400/80"  :
+                                    "text-orange-400/80";
 
   return (
-    <div className="flex items-center gap-2.5 py-2 border-b border-surface-border/30 last:border-0">
-      <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded shrink-0", posColor)}>
+    <motion.div
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.04, duration: 0.2 }}
+      whileHover={{ backgroundColor: "rgba(255,255,255,0.02)" }}
+      className="flex items-center gap-3 py-2.5 rounded-md px-2 -mx-2 transition-colors"
+    >
+      <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 tracking-wide", posStyle)}>
         {posAbbr}
       </span>
-      <p className="text-sm font-medium text-foreground flex-1 truncate">{player.web_name}</p>
-      {player.chance_of_playing !== null && player.chance_of_playing !== undefined && player.chance_of_playing > 0 && (
-        <span className="text-[10px] text-amber-400/70 shrink-0">{player.chance_of_playing}% chance</span>
+      <p className="text-sm font-medium text-foreground/85 flex-1 truncate">{player.web_name}</p>
+      {player.chance_of_playing !== null &&
+        player.chance_of_playing !== undefined &&
+        player.chance_of_playing > 0 && (
+          <span className="text-[10px] text-amber-400/60 shrink-0 tabular-nums">
+            {player.chance_of_playing}%
+          </span>
       )}
-      <span className={cn("text-[9px] font-black border rounded px-1.5 py-0.5 shrink-0", statusColor)}>
+      <span className={cn("text-[10px] font-bold shrink-0 tabular-nums", statusStyle)}>
         {statusLabel}
       </span>
-    </div>
+    </motion.div>
   );
 }
 
@@ -126,126 +181,173 @@ function AbsentRow({ player }: { player: AbsentPlayer }) {
 
 function TeamPanel({ team, side }: { team: TeamInjuryImpact; side: "home" | "away" }) {
   const [expanded, setExpanded] = useState(false);
-  const cfg  = LEVEL[team.impact_level];
+  const cfg    = LEVEL[team.impact_level];
   const atkCfg = LEVEL[team.attack_impact];
   const noImpact = team.absent_count === 0;
 
   return (
-    <div className={cn(
-      "rounded-xl border bg-[#0c0c0f] overflow-hidden",
-      noImpact ? "border-surface-border/40" : cfg.border,
-    )}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border/40 bg-surface-elevated/20">
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest">
-            {side === "home" ? "HOME" : "AWAY"}
-          </span>
-          <span className="text-muted-foreground/30">·</span>
-          <p className="text-sm font-bold text-foreground">{team.team}</p>
-        </div>
-        <span className={cn(
-          "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded border",
-          noImpact ? "text-emerald-400 border-emerald-500/30" : `${cfg.text} ${cfg.border}`,
-        )}>
-          {noImpact ? "NO CONCERN" : cfg.label}
-        </span>
-      </div>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={cn(
+        "relative rounded-2xl border overflow-hidden",
+        "bg-gradient-to-b from-[#0f0f12] to-[#0a0a0d]",
+        noImpact ? "border-white/6 shadow-none" : `${cfg.border} shadow-lg ${cfg.glow}`,
+      )}
+    >
+      {/* Severity gradient wash */}
+      {!noImpact && (
+        <div className={cn("absolute inset-x-0 top-0 h-32 bg-gradient-to-b pointer-events-none", cfg.gradient)} />
+      )}
 
-      {noImpact ? (
-        <div className="px-4 py-6 flex items-center gap-3">
-          <Shield className="w-4 h-4 text-emerald-400/40 shrink-0" />
-          <p className="text-xs text-muted-foreground">Full squad available — no injury disruption detected.</p>
-        </div>
-      ) : (
-        <>
-          {/* 4-metric strip */}
-          <div className="grid grid-cols-4 divide-x divide-surface-border/40 border-b border-surface-border/40">
-            <StatCell
-              label="Attack Impact"
-              value={atkCfg.label}
-              valueClass={cn("text-base font-black", atkCfg.text)}
-            />
-            <StatCell
-              label="Def. Stability"
-              value={team.defensive_stability_pct === 0 ? "—" : `${team.defensive_stability_pct}%`}
-              valueClass={team.defensive_stability_pct < 0 ? "text-orange-400" : "text-foreground"}
-            />
-            <StatCell
-              label="Win Prob."
-              value={team.prob_shift === 0 ? "—" : `${team.prob_shift > 0 ? "+" : ""}${team.prob_shift}pp`}
-              valueClass={team.prob_shift < 0 ? "text-red-400" : team.prob_shift > 0 ? "text-emerald-400" : "text-muted-foreground"}
-            />
-            <StatCell
-              label="Unavailable"
-              value={String(team.absent_count)}
-              sub={team.absent_count === 1 ? "player" : "players"}
-            />
+      {/* Content */}
+      <div className="relative">
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/40 mb-1">
+              {side === "home" ? "Home" : "Away"}
+            </p>
+            <p className="text-base font-bold text-foreground leading-none">{team.team}</p>
           </div>
 
-          {/* Key absence */}
-          {team.most_impactful && (
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-border/40">
-              <div className="w-0.5 h-8 rounded-full bg-amber-400/50 shrink-0" />
-              <div>
-                <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 mb-0.5">
-                  Key absence
-                </p>
-                <p className="text-sm font-bold text-foreground leading-none">
-                  {team.most_impactful}
-                  {team.most_impactful_role && (
-                    <span className="ml-2 text-xs font-normal text-amber-400">
-                      {team.most_impactful_role}
-                    </span>
-                  )}
-                </p>
-              </div>
+          {noImpact ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                Fit
+              </span>
+            </div>
+          ) : (
+            <div className={cn(
+              "flex items-center gap-2 px-3.5 py-1.5 rounded-full border",
+              cfg.badgeBg, cfg.border
+            )}>
+              <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg.dot)} />
+              <span className={cn("text-[10px] font-bold uppercase tracking-wider", cfg.text)}>
+                {cfg.label}
+              </span>
             </div>
           )}
+        </div>
 
-          {/* AI Assessment */}
-          <div className="px-4 py-3 border-b border-surface-border/40">
-            <p className="text-[9px] uppercase tracking-widest text-muted-foreground/40 mb-1.5">
-              Intelligence Assessment
+        {noImpact ? (
+          <div className="flex items-center gap-3 px-6 pb-6 pt-1">
+            <Shield className="w-4 h-4 text-emerald-400/30 shrink-0" />
+            <p className="text-sm text-muted-foreground/50">
+              Full squad available. No disruption detected.
             </p>
-            <p className="text-xs text-foreground/65 leading-relaxed">{team.ai_summary}</p>
           </div>
+        ) : (
+          <>
+            {/* ── 4-metric row ── */}
+            <div className="grid grid-cols-4 px-2 pb-1">
+              <MetricBlock
+                label="Attack Impact"
+                value={atkCfg.label}
+                valueClass={cn("text-lg font-black", atkCfg.text)}
+              />
+              <MetricBlock
+                label="Def. Stability"
+                value={team.defensive_stability_pct === 0 ? "—" : `${team.defensive_stability_pct}%`}
+                valueClass={team.defensive_stability_pct < 0 ? "text-orange-400" : "text-foreground"}
+              />
+              <MetricBlock
+                label="Win Prob."
+                value={team.prob_shift === 0 ? "—" : `${team.prob_shift > 0 ? "+" : ""}${team.prob_shift}pp`}
+                valueClass={
+                  team.prob_shift < 0 ? "text-red-400" :
+                  team.prob_shift > 0 ? "text-emerald-400" :
+                  "text-muted-foreground"
+                }
+              />
+              <MetricBlock
+                label="Unavailable"
+                value={String(team.absent_count)}
+                note={team.absent_count === 1 ? "player" : "players"}
+              />
+            </div>
 
-          {/* Expandable roster */}
-          {team.absent_players.length > 0 && (
-            <>
-              <button
-                onClick={() => setExpanded((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-[10px] font-semibold text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-              >
-                <span className="uppercase tracking-wider">
-                  {expanded ? "Hide" : "View"} squad absentees ({team.absent_players.length})
-                </span>
-                {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
+            {/* ── Divider ── */}
+            <div className="mx-6 h-px bg-white/5" />
 
-              <AnimatePresence>
-                {expanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
+            {/* ── Key absence ── */}
+            {team.most_impactful && (
+              <div className="px-6 py-4">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40 mb-2">
+                  Key Absence
+                </p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-base font-bold text-foreground">{team.most_impactful}</p>
+                  {team.most_impactful_role && (
+                    <p className="text-xs text-amber-400/70 font-medium">{team.most_impactful_role}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Divider ── */}
+            <div className="mx-6 h-px bg-white/5" />
+
+            {/* ── AI Assessment — prominent block ── */}
+            <div className="px-6 py-5">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40 mb-3">
+                Intelligence Assessment
+              </p>
+              <p className="text-sm text-foreground/75 leading-relaxed font-normal">
+                {team.ai_summary}
+              </p>
+            </div>
+
+            {/* ── Expandable roster ── */}
+            {team.absent_players.length > 0 && (
+              <>
+                <div className="mx-6 h-px bg-white/5" />
+                <button
+                  onClick={() => setExpanded((v) => !v)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-6 py-3.5",
+                    "text-[10px] font-semibold uppercase tracking-wider",
+                    "text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors",
+                  )}
+                >
+                  <span>
+                    {expanded ? "Hide" : "View"} squad absentees&nbsp;
+                    <span className="tabular-nums">({team.absent_players.length})</span>
+                  </span>
+                  <motion.span
+                    animate={{ rotate: expanded ? 180 : 0 }}
                     transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
                   >
-                    <div className="px-4 pb-4">
-                      {team.absent_players.map((p, i) => (
-                        <AbsentRow key={i} player={p} />
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </>
-          )}
-        </>
-      )}
-    </div>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </motion.span>
+                </button>
+
+                <AnimatePresence>
+                  {expanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-6 pb-5 pt-1 space-y-0.5">
+                        {team.absent_players.map((p, i) => (
+                          <AbsentRow key={i} player={p} index={i} />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
@@ -260,7 +362,8 @@ interface Props {
 export function InjuryImpactCenter({ predictionId, homeTeam, awayTeam }: Props) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["injury-impact", predictionId],
-    queryFn: () => predictionsService.getInjuryImpact(predictionId).then((r) => r.data as InjuryImpactResponse),
+    queryFn: () =>
+      predictionsService.getInjuryImpact(predictionId).then((r) => r.data as InjuryImpactResponse),
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -269,42 +372,54 @@ export function InjuryImpactCenter({ predictionId, homeTeam, awayTeam }: Props) 
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.35 }}
+      transition={{ delay: 0.35, duration: 0.4 }}
     >
-      {/* Heading */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-1 h-6 rounded-full bg-neon-green shrink-0" />
-          <h2 className="text-base font-bold text-foreground tracking-tight">Injury Impact Center</h2>
-          <span className="text-[9px] text-muted-foreground/40 uppercase tracking-widest hidden sm:inline">
-            Squad Intelligence
-          </span>
+      {/* Section heading */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-[3px] h-7 rounded-full bg-neon-green shrink-0" />
+          <div>
+            <h2 className="text-base font-bold text-foreground tracking-tight leading-none mb-0.5">
+              Injury Impact Center
+            </h2>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40 leading-none">
+              Squad Intelligence · Premier League
+            </p>
+          </div>
         </div>
         {!isLoading && !isError && totalAbsent > 0 && (
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-red-400">
-            <Users className="w-3 h-3" />
-            <span>{totalAbsent} absent</span>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/8 border border-red-500/15"
+          >
+            <Users className="w-3 h-3 text-red-400" />
+            <span className="text-[10px] font-bold text-red-400">{totalAbsent} absent</span>
+          </motion.div>
         )}
       </div>
 
       <AnimatePresence mode="wait">
         {isLoading && (
           <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="h-[220px] rounded-xl bg-surface-elevated/20 animate-pulse border border-surface-border/30" />
-              <div className="h-[220px] rounded-xl bg-surface-elevated/20 animate-pulse border border-surface-border/30" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  className="h-[280px] rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent border border-white/6 animate-pulse"
+                />
+              ))}
             </div>
           </motion.div>
         )}
 
         {isError && (
           <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="rounded-xl border border-surface-border/40 bg-[#0c0c0f] p-4 flex items-center gap-3">
-              <AlertTriangle className="w-4 h-4 text-amber-400/50 shrink-0" />
-              <p className="text-xs text-muted-foreground">Squad intelligence temporarily unavailable</p>
+            <div className="rounded-2xl border border-white/6 bg-[#0f0f12] px-6 py-5 flex items-center gap-4">
+              <AlertTriangle className="w-4 h-4 text-amber-400/40 shrink-0" />
+              <p className="text-sm text-muted-foreground/50">Squad intelligence temporarily unavailable</p>
             </div>
           </motion.div>
         )}
@@ -312,17 +427,25 @@ export function InjuryImpactCenter({ predictionId, homeTeam, awayTeam }: Props) 
         {data && !isLoading && !isError && (
           <motion.div key="data" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {data.league_slug !== "ENG.1" ? (
-              <div className="rounded-xl border border-surface-border/40 bg-[#0c0c0f] p-5 flex items-center gap-3">
-                <Shield className="w-4 h-4 text-muted-foreground/30 shrink-0" />
+              <div className="rounded-2xl border border-white/6 bg-[#0f0f12] px-6 py-6 flex items-center gap-4">
+                <Shield className="w-5 h-5 text-muted-foreground/20 shrink-0" />
                 <div>
-                  <p className="text-sm text-foreground/70">Squad intelligence available for Premier League only</p>
-                  <p className="text-[9px] text-muted-foreground/40 mt-0.5 uppercase tracking-wider">Powered by FPL API</p>
+                  <p className="text-sm text-foreground/60">
+                    Squad intelligence available for Premier League only
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/30 mt-1 uppercase tracking-wider">
+                    Powered by FPL API
+                  </p>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {data.home && <TeamPanel team={{ ...data.home, team: homeTeam }} side="home" />}
-                {data.away && <TeamPanel team={{ ...data.away, team: awayTeam }} side="away" />}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {data.home && (
+                  <TeamPanel team={{ ...data.home, team: homeTeam }} side="home" />
+                )}
+                {data.away && (
+                  <TeamPanel team={{ ...data.away, team: awayTeam }} side="away" />
+                )}
               </div>
             )}
           </motion.div>
