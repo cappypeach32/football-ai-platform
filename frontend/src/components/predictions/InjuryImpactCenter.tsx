@@ -2,8 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Shield, Users, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, Shield, Users, ChevronDown } from "lucide-react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { predictionsService } from "@/services/predictionsService";
 
@@ -47,6 +47,39 @@ interface InjuryImpactResponse {
   is_pl_only: boolean;
   home: TeamInjuryImpact | null;
   away: TeamInjuryImpact | null;
+}
+
+// ─── Confidence helpers ─────────────────────────────────────────────────────
+
+type ConfidenceLevel = "LOW" | "MEDIUM" | "HIGH";
+
+function deriveInjuryConfidence(team: TeamInjuryImpact): ConfidenceLevel {
+  if (team.absent_count === 0) return "HIGH";
+  const hasFullStats = team.absent_players.some((p) => p.ict_index > 0);
+  return hasFullStats ? "HIGH" : "MEDIUM";
+}
+
+function deriveAIConfidence(team: TeamInjuryImpact): ConfidenceLevel {
+  if (team.absent_count === 0) return "HIGH";
+  const hasRole = !!team.most_impactful_role;
+  const hasFullStats = team.absent_players.some((p) => p.ict_index > 0);
+  if (hasRole && hasFullStats) return "HIGH";
+  if (hasRole || hasFullStats) return "MEDIUM";
+  return "LOW";
+}
+
+const CONF_STYLE: Record<ConfidenceLevel, { text: string; dot: string }> = {
+  HIGH:   { text: "text-emerald-400/80", dot: "bg-emerald-400" },
+  MEDIUM: { text: "text-amber-400/80",   dot: "bg-amber-400"   },
+  LOW:    { text: "text-muted-foreground/50", dot: "bg-muted-foreground/40" },
+};
+
+function formatAge(ms: number): string {
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ago`;
 }
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -181,9 +214,13 @@ function AbsentRow({ player, index }: { player: AbsentPlayer; index: number }) {
 
 function TeamPanel({ team, side }: { team: TeamInjuryImpact; side: "home" | "away" }) {
   const [expanded, setExpanded] = useState(false);
-  const cfg    = LEVEL[team.impact_level];
-  const atkCfg = LEVEL[team.attack_impact];
-  const noImpact = team.absent_count === 0;
+  const cfg         = LEVEL[team.impact_level];
+  const atkCfg      = LEVEL[team.attack_impact];
+  const noImpact    = team.absent_count === 0;
+  const injConf     = deriveInjuryConfidence(team);
+  const aiConf      = deriveAIConfidence(team);
+  const injConfStyle = CONF_STYLE[injConf];
+  const aiConfStyle  = CONF_STYLE[aiConf];
 
   return (
     <motion.div
@@ -213,24 +250,35 @@ function TeamPanel({ team, side }: { team: TeamInjuryImpact; side: "home" | "awa
             <p className="text-base font-bold text-foreground leading-none">{team.team}</p>
           </div>
 
-          {noImpact ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                Fit
+          <div className="flex flex-col items-end gap-1.5">
+            {noImpact ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Fit</span>
+              </div>
+            ) : (
+              <div className={cn("flex items-center gap-2 px-3.5 py-1.5 rounded-full border", cfg.badgeBg, cfg.border)}>
+                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg.dot)} />
+                <span className={cn("text-[10px] font-bold uppercase tracking-wider", cfg.text)}>
+                  {cfg.label}
+                </span>
+              </div>
+            )}
+            {/* Confidence meta */}
+            <div className="flex items-center gap-2.5">
+              <span className={cn("flex items-center gap-1 text-[9px] font-semibold", injConfStyle.text)}>
+                <span className="text-muted-foreground/30 uppercase tracking-wide">Data</span>
+                <span className={cn("w-1 h-1 rounded-full inline-block", injConfStyle.dot)} />
+                <span className="uppercase tracking-wide">{injConf}</span>
+              </span>
+              <span className="text-muted-foreground/20">·</span>
+              <span className={cn("flex items-center gap-1 text-[9px] font-semibold", aiConfStyle.text)}>
+                <span className="text-muted-foreground/30 uppercase tracking-wide">AI</span>
+                <span className={cn("w-1 h-1 rounded-full inline-block", aiConfStyle.dot)} />
+                <span className="uppercase tracking-wide">{aiConf}</span>
               </span>
             </div>
-          ) : (
-            <div className={cn(
-              "flex items-center gap-2 px-3.5 py-1.5 rounded-full border",
-              cfg.badgeBg, cfg.border
-            )}>
-              <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg.dot)} />
-              <span className={cn("text-[10px] font-bold uppercase tracking-wider", cfg.text)}>
-                {cfg.label}
-              </span>
-            </div>
-          )}
+          </div>
         </div>
 
         {noImpact ? (
@@ -293,9 +341,21 @@ function TeamPanel({ team, side }: { team: TeamInjuryImpact; side: "home" | "awa
 
             {/* ── AI Assessment — prominent block ── */}
             <div className="px-6 py-5">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40 mb-3">
-                Intelligence Assessment
-              </p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40">
+                  Intelligence Assessment
+                </p>
+                <span className={cn(
+                  "flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded",
+                  aiConf === "HIGH"   ? "text-emerald-400/70 bg-emerald-500/8"  :
+                  aiConf === "MEDIUM" ? "text-amber-400/70 bg-amber-400/8"      :
+                                       "text-muted-foreground/50 bg-surface-elevated/30"
+                )}>
+                  <span>AI</span>
+                  <span className={cn("w-1 h-1 rounded-full", CONF_STYLE[aiConf].dot)} />
+                  <span>{aiConf}</span>
+                </span>
+              </div>
               <p className="text-sm text-foreground/75 leading-relaxed font-normal">
                 {team.ai_summary}
               </p>
@@ -360,7 +420,7 @@ interface Props {
 }
 
 export function InjuryImpactCenter({ predictionId, homeTeam, awayTeam }: Props) {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, dataUpdatedAt } = useQuery({
     queryKey: ["injury-impact", predictionId],
     queryFn: () =>
       predictionsService.getInjuryImpact(predictionId).then((r) => r.data as InjuryImpactResponse),
@@ -369,6 +429,11 @@ export function InjuryImpactCenter({ predictionId, homeTeam, awayTeam }: Props) 
   });
 
   const totalAbsent = (data?.home?.absent_count ?? 0) + (data?.away?.absent_count ?? 0);
+
+  const updatedLabel = useMemo(() => {
+    if (!dataUpdatedAt) return null;
+    return formatAge(Date.now() - dataUpdatedAt);
+  }, [dataUpdatedAt]);
 
   return (
     <motion.section
@@ -381,12 +446,24 @@ export function InjuryImpactCenter({ predictionId, homeTeam, awayTeam }: Props) 
         <div className="flex items-center gap-3">
           <div className="w-[3px] h-7 rounded-full bg-neon-green shrink-0" />
           <div>
-            <h2 className="text-base font-bold text-foreground tracking-tight leading-none mb-0.5">
+            <h2 className="text-base font-bold text-foreground tracking-tight leading-none mb-1">
               Injury Impact Center
             </h2>
-            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40 leading-none">
-              Squad Intelligence · Premier League
-            </p>
+            <div className="flex items-center gap-2">
+              {/* Live pulse */}
+              <span className="relative flex items-center justify-center w-2 h-2">
+                <span className="absolute inline-flex w-full h-full rounded-full bg-neon-green/40 animate-pulse" />
+                <span className="relative inline-flex w-1 h-1 rounded-full bg-neon-green" />
+              </span>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40 leading-none">
+                Live · Squad Intelligence
+              </p>
+              {updatedLabel && !isLoading && (
+                <p className="text-[9px] text-muted-foreground/25 leading-none hidden sm:block">
+                  · {updatedLabel}
+                </p>
+              )}
+            </div>
           </div>
         </div>
         {!isLoading && !isError && totalAbsent > 0 && (
