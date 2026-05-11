@@ -214,6 +214,47 @@ class PredictionEngine:
         # ── 10. Exact score top-5 ─────────────────────────────────────────────
         top_scores = self._poisson.exact_score_top(matrix)
 
+        # ── 11. Model agreement ───────────────────────────────────────────────
+        # Measure how many of the 3 independent signals agree on recommended 1X2 bet.
+        # Signals: (a) Poisson-only, (b) ELO-only, (c) XGB (if available, else Poisson)
+        def _winner(hw, d, aw):
+            best_prob = max(hw, d, aw)
+            if best_prob == hw: return "1"
+            if best_prob == d:  return "X"
+            return "2"
+
+        poisson_raw_hw, poisson_raw_d, poisson_raw_aw = self._poisson.outcome_probs(
+            self._poisson.predict_score_matrix(home_xg, away_xg)
+        )
+        poisson_winner = _winner(poisson_raw_hw, poisson_raw_d, poisson_raw_aw)
+
+        # ELO signal: build win probability from ELO alone
+        elo_diff = home_team.elo_rating - away_team.elo_rating
+        elo_home_win = 1.0 / (1.0 + 10.0 ** (-elo_diff / 400.0))
+        elo_draw = 0.27  # rough constant
+        elo_away_win = 1.0 - elo_home_win - elo_draw
+        elo_winner = _winner(elo_home_win, elo_draw, max(elo_away_win, 0.0))
+
+        # XGB signal: use final blended probs as proxy (captures XGB influence)
+        xgb_winner = _winner(p_hw, p_d, p_aw)
+
+        if recommended and recommended in ("1", "X", "2"):
+            votes = [poisson_winner == recommended,
+                     elo_winner == recommended,
+                     xgb_winner == recommended]
+            model_agreement = sum(votes)
+        else:
+            model_agreement = None
+
+        # ── 12. Asian Handicap line ──────────────────────────────────────────
+        # Derive from expected goal differential, snapped to nearest 0.25
+        xg_diff = home_xg - away_xg
+        # AH line from home perspective: negative means home favoured
+        raw_ah = -round(xg_diff * 2) / 2   # snap to 0.5
+        # Refine to 0.25 quarter-ball
+        quarter_snap = round(xg_diff * 4) / 4
+        ah_line = round(-quarter_snap, 2)
+
         return {
             "home_win_prob":    round(p_hw, 4),
             "draw_prob":        round(p_d, 4),
@@ -242,6 +283,8 @@ class PredictionEngine:
             "odds_home":        getattr(match, "odds_home", None),
             "odds_draw":        getattr(match, "odds_draw", None),
             "odds_away":        getattr(match, "odds_away", None),
+            "model_agreement":  model_agreement,
+            "ah_line":          ah_line,
             "model_version":    self.MODEL_VERSION,
         }
 

@@ -3,8 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import type { Prediction } from "@/types";
-import { formatConfidence, formatProbability } from "@/lib/utils";
-import { Brain, Zap, Activity, TrendingUp } from "lucide-react";
+import { Brain, Zap, Activity, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useCardGlow } from "@/hooks/useCardGlow";
@@ -14,234 +13,260 @@ interface Props {
   compact?: boolean;
 }
 
-/** Kelly Criterion: f* = (b·p − q) / b, clamped [0, 0.5] */
-function computeKelly(prob: number, decimalOdds: number | null): number {
-  if (!decimalOdds || decimalOdds <= 1.01) return 0;
-  const b = decimalOdds - 1;
-  const f = (b * prob - (1 - prob)) / b;
-  return Math.max(0, Math.min(f, 0.5));
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function resolvePickLabel(p: Prediction): string {
+  const home = p.match.home_team.name;
+  const away = p.match.away_team.name;
+  switch (p.recommended_bet) {
+    case "1": return `${home} to Win`;
+    case "X": return "Draw";
+    case "2": return `${away} to Win`;
+    case "over_2.5": return "Over 2.5 Goals";
+    case "under_2.5": return "Under 2.5 Goals";
+    case "btts_yes": return "Both Teams to Score";
+    case "btts_no": return "Clean Sheet";
+    default: return p.recommended_bet ?? "—";
+  }
 }
 
-function KellyBar({ prediction: p }: { prediction: Prediction }) {
-  // Pick best positive kelly market
-  const candidates: { label: string; kelly: number; color: string }[] = [
-    { label: "Home", kelly: computeKelly(p.home_win_prob, p.odds_home), color: "bg-neon-green" },
-    { label: "Draw", kelly: computeKelly(p.draw_prob, p.odds_draw), color: "bg-neon-yellow" },
-    { label: "Away", kelly: computeKelly(p.away_win_prob, p.odds_away), color: "bg-neon-blue" },
-  ];
-
-  // Use recommended_bet preference if set
-  let best = candidates.filter((c) => c.kelly > 0).sort((a, b) => b.kelly - a.kelly)[0];
-  if (p.recommended_bet) {
-    const name = p.recommended_bet.toLowerCase();
-    const match = candidates.find((c) => c.label.toLowerCase() === name && c.kelly > 0);
-    if (match) best = match;
+function resolvePickOdds(p: Prediction): number | null {
+  switch (p.recommended_bet) {
+    case "1": return p.odds_home;
+    case "X": return p.odds_draw;
+    case "2": return p.odds_away;
+    default: return null;
   }
+}
 
-  if (!best || best.kelly <= 0) return null;
+function resolvePickProb(p: Prediction): number {
+  switch (p.recommended_bet) {
+    case "1": return p.home_win_prob;
+    case "X": return p.draw_prob;
+    case "2": return p.away_win_prob;
+    case "over_2.5": return p.over_25_prob;
+    case "under_2.5": return p.under_25_prob;
+    case "btts_yes": return p.btts_yes_prob;
+    case "btts_no": return p.btts_no_prob;
+    default: return Math.max(p.home_win_prob, p.draw_prob, p.away_win_prob);
+  }
+}
 
-  const pct = best.kelly * 100;
-  const barWidth = Math.min(pct * 2, 100); // scale display: 50% kelly = full bar
+function computeEV(prob: number, odds: number | null): number | null {
+  if (!odds || odds <= 1) return null;
+  return Math.round((prob * odds - 1) * 1000) / 10;
+}
 
+function formatAH(line: number | null): string {
+  if (line === null || line === undefined) return "—";
+  if (line === 0) return "0";
+  return line > 0 ? `+${line}` : `${line}`;
+}
+
+function ModelAgreementDots({ agreement }: { agreement: number | null }) {
+  const filled = agreement ?? 0;
+  const dotColor = filled >= 3 ? "bg-neon-green" : filled === 2 ? "bg-neon-yellow" : "bg-orange-400";
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, duration: 0.35 }}
-      className="mt-3 pt-3 border-t border-surface-border/50"
-    >
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-          <TrendingUp className="w-3 h-3 text-neon-green" />
-          Kelly Stake · {best.label}
-        </span>
-        <span className="text-[11px] font-mono font-bold text-neon-green">{pct.toFixed(1)}%</span>
-      </div>
-      <div className="w-full h-1.5 bg-surface-navy rounded-full overflow-hidden">
-        <motion.div
-          className={cn("h-full rounded-full", best.color)}
-          style={{ boxShadow: `0 0 8px rgba(0,255,135,0.5)` }}
-          initial={{ width: 0 }}
-          animate={{ width: `${barWidth}%` }}
-          transition={{ duration: 0.7, delay: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        />
-      </div>
-    </motion.div>
+    <div className="flex items-center gap-1.5">
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={cn("w-2 h-2 rounded-full", i < filled ? dotColor : "bg-surface-border")} />
+      ))}
+      <span className="text-[10px] font-mono text-muted-foreground ml-0.5">{filled}/3</span>
+    </div>
   );
 }
+
+// ── Main Card ─────────────────────────────────────────────────────────────────
 
 export function PredictionCard({ prediction: p, compact }: Props) {
-  const { label: confLabel, className: confClass } = formatConfidence(p.confidence_score);
-  const isHighConf = p.confidence_score >= 70;
+  const pickLabel = resolvePickLabel(p);
+  const pickOdds  = resolvePickOdds(p);
+  const pickProb  = resolvePickProb(p);
+  const ev        = computeEV(pickProb, pickOdds);
+  const isValue   = p.value_bet;
+  const isHighConf = p.confidence_score >= 65;
+
   const glow = useCardGlow(
-    p.value_bet ? "0,255,135" : "0,212,255",
-    p.value_bet ? 0.14 : 0.09
+    isValue ? "0,255,135" : "0,212,255",
+    isValue ? 0.14 : 0.08
   );
+
+  if (compact) {
+    return (
+      <Link href={`/predictions/${p.id}`}>
+        <div className="match-card flex items-center justify-between gap-3 py-3 px-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate">{p.match.home_team.name} vs {p.match.away_team.name}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{pickLabel}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-mono font-bold text-neon-green">{p.confidence_score.toFixed(0)}%</span>
+            {isValue && <Zap className="w-3.5 h-3.5 text-neon-green" />}
+          </div>
+        </div>
+      </Link>
+    );
+  }
 
   return (
     <Link href={`/predictions/${p.id}`}>
       <motion.div
         ref={glow.ref}
         {...glow.handlers}
-        initial={{ opacity: 0, y: 12, filter: "blur(3px)" }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
         whileHover={{ y: -2 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1], opacity: { duration: 0.25 }, filter: { duration: 0.25 } }}
-        className={cn(
-          "match-card card-glow group",
-          p.value_bet && "value-bet-card",
-          isHighConf && !p.value_bet && "border-neon-green/10"
-        )}
+        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+        className={cn("match-card card-glow group relative overflow-hidden", isValue && "value-bet-card")}
       >
-        {/* Top accent line for high-confidence predictions */}
         {isHighConf && (
-          <motion.div
-            className="absolute top-0 left-0 right-0 h-px rounded-t-xl"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,135,0.5), transparent)", opacity: 0.8 }}
-          />
+          <div className="absolute top-0 left-0 right-0 h-px"
+               style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,135,0.5), transparent)" }} />
         )}
 
-        {/* League & date */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             {p.match.league.name} · {p.match.league.country}
           </span>
-          <span className="text-[11px] text-muted-foreground tabular-nums">
+          <span className="text-[11px] text-muted-foreground tabular-nums font-mono">
             {format(new Date(p.match.match_date), "dd MMM, HH:mm")}
           </span>
         </div>
 
         {/* Teams */}
         <div className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex-1 text-center">
-            <p className="font-bold text-foreground text-sm md:text-base truncate font-display">
-              {p.match.home_team.name}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
-              ELO {p.match.home_team.elo_rating.toFixed(0)}
-            </p>
+          <div className="flex-1 text-left">
+            <p className="font-bold text-foreground text-sm md:text-base truncate">{p.match.home_team.name}</p>
+            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">ELO {p.match.home_team.elo_rating?.toFixed(0) ?? "—"}</p>
           </div>
+          <div className="w-10 h-10 rounded-xl bg-surface-navy border border-surface-border flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-bold text-muted-foreground tracking-wider">VS</span>
+          </div>
+          <div className="flex-1 text-right">
+            <p className="font-bold text-foreground text-sm md:text-base truncate">{p.match.away_team.name}</p>
+            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">ELO {p.match.away_team.elo_rating?.toFixed(0) ?? "—"}</p>
+          </div>
+        </div>
 
-          <div className="text-center flex-shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-surface-navy border border-surface-border flex items-center justify-center
-                            group-hover:border-neon-green/20 transition-colors duration-300">
-              <span className="text-xs font-bold text-muted-foreground font-display tracking-wider">VS</span>
+        {/* AI Pick banner */}
+        <div className={cn(
+          "rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3",
+          isValue ? "bg-neon-green/10 border border-neon-green/20" : "bg-surface-elevated border border-surface-border"
+        )}>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-0.5">AI Pick</p>
+            <p className={cn("font-bold text-sm", isValue ? "text-neon-green" : "text-foreground")}>{pickLabel}</p>
+          </div>
+          {pickOdds && (
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Odds</p>
+              <p className="text-xl font-bold font-mono text-foreground">{pickOdds.toFixed(2)}</p>
             </div>
-          </div>
-
-          <div className="flex-1 text-center">
-            <p className="font-bold text-foreground text-sm md:text-base truncate font-display">
-              {p.match.away_team.name}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
-              ELO {p.match.away_team.elo_rating.toFixed(0)}
-            </p>
-          </div>
-        </div>
-
-        {/* Probability bars */}
-        <div className="space-y-2 mb-4">
-          <ProbRow label={p.match.home_team.short_name ?? "Home"} prob={p.home_win_prob} color="bg-neon-green" glowColor="rgba(0,255,135,0.5)" />
-          <ProbRow label="Draw" prob={p.draw_prob} color="bg-neon-yellow" glowColor="rgba(245,230,66,0.5)" />
-          <ProbRow label={p.match.away_team.short_name ?? "Away"} prob={p.away_win_prob} color="bg-neon-blue" glowColor="rgba(0,212,255,0.5)" />
-        </div>
-
-        {/* Odds row — shown only when real odds are available */}
-        {!compact && (p.odds_home || p.odds_draw || p.odds_away) && (
-          <div className="flex items-center justify-between mb-3 px-1">
-            {[
-              { label: p.match.home_team.short_name ?? "H", odds: p.odds_home, color: "text-neon-green" },
-              { label: "D", odds: p.odds_draw, color: "text-neon-yellow" },
-              { label: p.match.away_team.short_name ?? "A", odds: p.odds_away, color: "text-neon-blue" },
-            ].map(({ label, odds, color }) => (
-              <div key={label} className="flex-1 text-center">
-                <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
-                <p className={`text-sm font-bold tabular-nums font-mono ${odds ? color : "text-muted-foreground/40"}`}>
-                  {odds ? odds.toFixed(2) : "—"}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Footer badges */}
-        {!compact && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Neural glow confidence badge */}
-            <motion.span
-              className={confClass}
-              animate={isHighConf ? {
-                boxShadow: [
-                  "0 0 0px rgba(0,255,135,0)",
-                  "0 0 10px rgba(0,255,135,0.35)",
-                  "0 0 0px rgba(0,255,135,0)",
-                ],
-              } : {}}
-              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          )}
+          {isValue && (
+            <motion.div
+              animate={{ boxShadow: ["0 0 0 rgba(0,255,135,0)", "0 0 12px rgba(0,255,135,0.4)", "0 0 0 rgba(0,255,135,0)"] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="flex-shrink-0 flex items-center gap-1 bg-neon-green/20 text-neon-green text-[10px] font-bold px-2 py-1 rounded-lg"
             >
-              <Brain className="w-3 h-3" />
-              {confLabel} {p.confidence_score.toFixed(0)}%
-            </motion.span>
-            {p.value_bet && (
-              <motion.span
-                className="value-bet-badge"
-                animate={{ boxShadow: ["0 0 0 rgba(0,255,135,0)", "0 0 8px rgba(0,255,135,0.4)", "0 0 0 rgba(0,255,135,0)"] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <Zap className="w-3 h-3" /> Value Bet
-              </motion.span>
-            )}
-            <span className="stat-badge bg-surface-elevated text-muted-foreground ml-auto tabular-nums">
-              <Activity className="w-3 h-3" />
-              xG {p.home_xg.toFixed(1)}–{p.away_xg.toFixed(1)}
-            </span>
-          </div>
-        )}
+              <Zap className="w-3 h-3" /> VALUE
+            </motion.div>
+          )}
+        </div>
 
-        {compact && (
-          <div className="flex items-center justify-between">
-            <span className={confClass}>{p.confidence_score.toFixed(0)}%</span>
-            {p.value_bet && (
-              <span className="value-bet-badge text-[10px]">
-                <Zap className="w-2.5 h-2.5" /> Value
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* AI summary excerpt */}
-        {!compact && p.ai_summary && (
-          <div className="scan-container mt-3 border-t border-surface-border/60 pt-3">
-            <p className="text-xs text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/80 transition-colors">
-              <Brain className="w-3 h-3 inline mr-1 text-neon-purple" />
-              {p.ai_summary}
+        {/* 4-stat grid */}
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          <div className="bg-surface-navy rounded-lg p-2.5 text-center">
+            <p className={cn(
+              "text-xl font-bold font-mono tabular-nums leading-none",
+              p.confidence_score >= 70 ? "text-neon-green" :
+              p.confidence_score >= 55 ? "text-neon-yellow" : "text-orange-400"
+            )}>
+              {p.confidence_score.toFixed(0)}%
             </p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1">Confidence</p>
           </div>
-        )}
+          <div className="bg-surface-navy rounded-lg p-2.5 text-center">
+            <p className={cn(
+              "text-xl font-bold font-mono tabular-nums leading-none",
+              ev === null ? "text-muted-foreground" : ev > 0 ? "text-neon-green" : "text-red-400"
+            )}>
+              {ev === null ? "—" : `${ev > 0 ? "+" : ""}${ev}%`}
+            </p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1">Edge</p>
+          </div>
+          <div className="bg-surface-navy rounded-lg p-2.5 text-center">
+            <p className="text-base font-bold font-mono tabular-nums leading-none text-sky-400">
+              {p.home_xg.toFixed(1)}<span className="text-muted-foreground text-xs">-</span>{p.away_xg.toFixed(1)}
+            </p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1">xScore</p>
+          </div>
+          <div className="bg-surface-navy rounded-lg p-2.5 text-center">
+            <p className="text-xl font-bold font-mono tabular-nums leading-none text-neon-purple">
+              {formatAH(p.ah_line)}
+            </p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1">AH</p>
+          </div>
+        </div>
 
-        {/* Kelly fraction bar – only for value bets with odds */}
-        {!compact && p.value_bet && <KellyBar prediction={p} />}
+        {/* 1X2 probability bars */}
+        <div className="space-y-2 mb-4">
+          <ProbRow label={p.match.home_team.short_name ?? "Home"} prob={p.home_win_prob} color="bg-neon-green" glow="rgba(0,255,135,0.5)" />
+          <ProbRow label="Draw" prob={p.draw_prob} color="bg-neon-yellow" glow="rgba(245,230,66,0.5)" />
+          <ProbRow label={p.match.away_team.short_name ?? "Away"} prob={p.away_win_prob} color="bg-neon-blue" glow="rgba(0,212,255,0.5)" />
+        </div>
+
+        {/* Model agreement + why this pick */}
+        <div className="flex items-start gap-4 pt-3 border-t border-surface-border/50 mb-3">
+          <div className="flex-shrink-0">
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1.5">Model Agreement</p>
+            <ModelAgreementDots agreement={p.model_agreement} />
+          </div>
+          {p.key_factors && p.key_factors.length > 0 && (
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1.5">Why this pick</p>
+              <ul className="space-y-0.5">
+                {p.key_factors.slice(0, 2).map((f, i) => (
+                  <li key={i} className="text-[10px] text-muted-foreground flex items-start gap-1 leading-tight">
+                    <span className="text-neon-green mt-0.5 flex-shrink-0">▸</span>
+                    <span className="line-clamp-1">{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* CTA footer */}
+        <div className="flex items-center justify-between pt-2 border-t border-surface-border/30">
+          <span className="text-[10px] font-mono text-muted-foreground">
+            <Activity className="w-3 h-3 inline mr-0.5" />xG {p.home_xg.toFixed(1)}–{p.away_xg.toFixed(1)}
+          </span>
+          <span className="flex items-center gap-1 text-[11px] text-neon-green group-hover:text-neon-green/80 font-semibold transition-colors">
+            Full Analysis <ChevronRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
       </motion.div>
     </Link>
   );
 }
 
-function ProbRow({ label, prob, color, glowColor }: { label: string; prob: number; color: string; glowColor: string }) {
+function ProbRow({ label, prob, color, glow }: { label: string; prob: number; color: string; glow: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-muted-foreground w-16 truncate">{label}</span>
+    <div className="flex items-center gap-2.5">
+      <span className="text-[10px] text-muted-foreground w-14 truncate">{label}</span>
       <div className="flex-1 bg-surface-navy rounded-full h-1.5 overflow-hidden">
         <motion.div
           className={cn("h-1.5 rounded-full", color)}
-          style={{ boxShadow: `0 0 6px ${glowColor}` }}
+          style={{ boxShadow: `0 0 6px ${glow}` }}
           initial={{ width: 0 }}
           animate={{ width: `${prob * 100}%` }}
           transition={{ duration: 0.9, ease: [0.25, 0.46, 0.45, 0.94] }}
         />
       </div>
-      <span className="text-xs font-mono text-foreground w-10 text-right tabular-nums">
-        {formatProbability(prob)}
+      <span className="text-[11px] font-mono text-foreground w-9 text-right tabular-nums">
+        {(prob * 100).toFixed(0)}%
       </span>
     </div>
   );

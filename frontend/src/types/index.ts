@@ -55,6 +55,8 @@ export interface Prediction {
   odds_home: number | null;
   odds_draw: number | null;
   odds_away: number | null;
+  model_agreement: number | null;
+  ah_line: number | null;
   result: "win" | "draw" | "loss" | "pending";
   is_correct: boolean | null;
   profit_loss: number | null;

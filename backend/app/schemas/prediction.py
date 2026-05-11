@@ -55,6 +55,8 @@ class PredictionResponse(BaseModel):
     odds_home: float | None
     odds_draw: float | None
     odds_away: float | None
+    model_agreement: int | None = None
+    ah_line: float | None = None
     result: str
     model_version: str
     created_at: datetime

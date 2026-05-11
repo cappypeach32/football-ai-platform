@@ -52,6 +52,11 @@ class Prediction(Base):
     profit_loss: Mapped[float | None] = mapped_column(Float)
     market_results: Mapped[dict | None] = mapped_column(JSON)
 
+    # Model agreement: how many of the 3 sub-models (Poisson, XGBoost, ELO) agree on recommended bet
+    model_agreement: Mapped[int | None] = mapped_column(Integer)   # 1–3
+    # Asian handicap line derived from xG differential (e.g. -0.5, +0.75)
+    ah_line: Mapped[float | None] = mapped_column(Float)
+
     model_version: Mapped[str] = mapped_column(String(50), default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
