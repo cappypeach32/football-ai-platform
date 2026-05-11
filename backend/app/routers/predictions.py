@@ -88,6 +88,69 @@ async def list_predictions(
     return result.scalars().all()
 
 
+@router.get("/hero", response_model=PredictionResponse | None)
+async def hero_prediction(
+    from_date: date | None = Query(None, description="Local calendar date (YYYY-MM-DD) floor"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Single best AI edge pick for today — highest-confidence value bet with market odds.
+    Returns null if no qualifying pick is available.
+    """
+    from datetime import datetime, timedelta, time as dtime
+    today = from_date or date.today()
+
+    date_floor = datetime.combine(today, dtime(0, 0, 0))
+    in_play_cutoff = datetime.utcnow() - timedelta(hours=3)
+    cutoff = max(in_play_cutoff, date_floor)
+
+    q = (
+        select(Prediction)
+        .join(Prediction.match)
+        .options(
+            selectinload(Prediction.match).selectinload(Match.league),
+            selectinload(Prediction.match).selectinload(Match.home_team),
+            selectinload(Prediction.match).selectinload(Match.away_team),
+        )
+        .where(
+            Match.match_date >= cutoff,
+            Prediction.value_bet == True,
+            # Must have market odds to compute an edge
+            or_(
+                Prediction.odds_home.is_not(None),
+                Prediction.odds_draw.is_not(None),
+                Prediction.odds_away.is_not(None),
+            ),
+        )
+        .order_by(desc(Prediction.confidence_score))
+        .limit(1)
+    )
+    result = await db.execute(q)
+    pred = result.scalars().first()
+
+    # Fallback: best prediction without value_bet filter if nothing qualifies
+    if pred is None:
+        q2 = (
+            select(Prediction)
+            .join(Prediction.match)
+            .options(
+                selectinload(Prediction.match).selectinload(Match.league),
+                selectinload(Prediction.match).selectinload(Match.home_team),
+                selectinload(Prediction.match).selectinload(Match.away_team),
+            )
+            .where(
+                Match.match_date >= cutoff,
+                Prediction.confidence_score >= 60,
+            )
+            .order_by(desc(Prediction.confidence_score))
+            .limit(1)
+        )
+        result2 = await db.execute(q2)
+        pred = result2.scalars().first()
+
+    return pred
+
+
 @router.get("/top", response_model=list[PredictionResponse])
 async def top_predictions(db: AsyncSession = Depends(get_db)):
     """Today's best AI picks."""

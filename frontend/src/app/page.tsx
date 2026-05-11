@@ -8,6 +8,7 @@ import { StatsOverviewBar } from "@/components/dashboard/StatsOverviewBar";
 import { LiveMatchesSidebar } from "@/components/dashboard/LiveMatchesSidebar";
 import { AIAlertsBanner } from "@/components/dashboard/AIAlertsBanner";
 import { DailyOverviewCard } from "@/components/dashboard/DailyOverviewCard";
+import { HeroPickCard, HeroPickCardSkeleton } from "@/components/dashboard/HeroPickCard";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { Prediction } from "@/types";
 import Link from "next/link";
@@ -17,6 +18,16 @@ const container = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } 
 const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
 export default function DashboardPage() {
+  const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local date
+
+  const { data: heroPred, isLoading: heroLoading } = useQuery({
+    queryKey: ["predictions", "hero", today],
+    queryFn: () => predictionsApi.getHero(today).then((r) => r.data as Prediction | null),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
+  });
+
   const { data: topPreds, isLoading: predsLoading } = useQuery({
     queryKey: ["predictions", "top"],
     queryFn: () => predictionsApi.getTop().then((r) => r.data as Prediction[]),
@@ -61,6 +72,13 @@ export default function DashboardPage() {
 
       {/* AI Alerts */}
       <AIAlertsBanner />
+
+      {/* Hero Pick */}
+      {heroLoading ? (
+        <HeroPickCardSkeleton />
+      ) : heroPred ? (
+        <HeroPickCard prediction={heroPred} />
+      ) : null}
 
       {/* Stats + Daily Overview */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
