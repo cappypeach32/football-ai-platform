@@ -3,19 +3,14 @@
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { predictionsApi, analyticsApi } from "@/lib/api";
-import { PredictionCard } from "@/components/predictions/PredictionCard";
 import { StatsOverviewBar } from "@/components/dashboard/StatsOverviewBar";
 
 import { AIAlertsBanner } from "@/components/dashboard/AIAlertsBanner";
 import { DailyOverviewCard } from "@/components/dashboard/DailyOverviewCard";
 import { HeroPickCard, HeroPickCardSkeleton } from "@/components/dashboard/HeroPickCard";
-import { Skeleton } from "@/components/ui/Skeleton";
 import type { Prediction } from "@/types";
 import Link from "next/link";
-import { Brain, ArrowRight } from "lucide-react";
-
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
-const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+import { ArrowRight } from "lucide-react";
 
 export default function DashboardPage() {
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local date
@@ -26,12 +21,6 @@ export default function DashboardPage() {
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     refetchIntervalInBackground: false,
-  });
-
-  const { data: topPreds, isLoading: predsLoading } = useQuery({
-    queryKey: ["predictions", "top"],
-    queryFn: () => predictionsApi.getTop().then((r) => r.data as Prediction[]),
-    refetchInterval: 5 * 60 * 1000,
   });
 
   const { data: overview } = useQuery({
@@ -89,50 +78,6 @@ export default function DashboardPage() {
           <DailyOverviewCard daily={daily} />
         </div>
       </div>
-
-      {/* Main — predictions full width */}
-      <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <Brain className="w-4 h-4 text-neon-purple" />
-              Today's Best Predictions
-            </h2>
-            <Link href="/predictions" className="text-xs text-neon-green hover:underline flex items-center gap-0.5">
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-
-          {predsLoading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-48 rounded-xl" />
-              ))}
-            </div>
-          ) : (
-            <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
-              {(topPreds ?? []).map((pred) => (
-                <motion.div key={pred.id} variants={item}>
-                  <PredictionCard prediction={pred} />
-                </motion.div>
-              ))}
-              {!topPreds?.length && <EmptyState />}
-            </motion.div>
-          )}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="glass-card p-12 text-center space-y-3">
-      <div className="w-16 h-16 rounded-2xl bg-surface-elevated flex items-center justify-center mx-auto">
-        <Brain className="w-8 h-8 text-muted-foreground/50" />
-      </div>
-      <p className="text-muted-foreground text-sm">No high-confidence predictions for today yet.</p>
-      <Link href="/predictions" className="inline-flex items-center gap-1 text-xs text-neon-green hover:underline">
-        Browse all predictions <ArrowRight className="w-3 h-3" />
-      </Link>
     </div>
   );
 }
