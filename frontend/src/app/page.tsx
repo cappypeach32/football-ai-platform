@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { predictionsApi, analyticsApi } from "@/lib/api";
 import { PredictionCard } from "@/components/predictions/PredictionCard";
 import { StatsOverviewBar } from "@/components/dashboard/StatsOverviewBar";
-import { LiveMatchesSidebar } from "@/components/dashboard/LiveMatchesSidebar";
+
 import { AIAlertsBanner } from "@/components/dashboard/AIAlertsBanner";
 import { DailyOverviewCard } from "@/components/dashboard/DailyOverviewCard";
 import { HeroPickCard, HeroPickCardSkeleton } from "@/components/dashboard/HeroPickCard";
@@ -90,10 +90,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main — 3 cols predictions + 1 col right panel */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-5">
-        {/* Predictions column */}
-        <div className="xl:col-span-3 space-y-4">
+      {/* Main — predictions full width */}
+      <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <Brain className="w-4 h-4 text-neon-purple" />
@@ -120,12 +118,6 @@ export default function DashboardPage() {
               {!topPreds?.length && <EmptyState />}
             </motion.div>
           )}
-        </div>
-
-        {/* Right panel */}
-        <div className="xl:col-span-1">
-          <LiveMatchesSidebar />
-        </div>
       </div>
     </div>
   );
