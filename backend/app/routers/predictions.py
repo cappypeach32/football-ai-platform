@@ -130,7 +130,7 @@ async def hero_prediction(
     result = await db.execute(q)
     pred = result.scalars().first()
 
-    # Fallback: best prediction without value_bet filter if nothing qualifies today
+    # Fallback: best confidence pick for today, no minimum threshold
     if pred is None:
         q2 = (
             select(Prediction)
@@ -143,7 +143,6 @@ async def hero_prediction(
             .where(
                 Match.match_date >= cutoff,
                 Match.match_date <= date_ceil,
-                Prediction.confidence_score >= 60,
             )
             .order_by(desc(Prediction.confidence_score))
             .limit(1)

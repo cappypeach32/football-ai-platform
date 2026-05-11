@@ -428,14 +428,18 @@ class PredictionEngine:
             recommended, primary_odds = "X", getattr(match, "odds_draw", None)
 
         is_value = False
-        # Check primary recommendation for value
-        if primary_odds and best_1x2_prob > 0:
-            implied = 1.0 / primary_odds
-            # Require 3% edge over implied probability
-            if best_1x2_prob > implied * 1.03:
-                is_value = True
-        else:
-            # Fallback when odds unavailable: require clear probability edge + minimum confidence
+        # Check ALL 1X2 markets for value edge (not just the recommended one)
+        for _bet, _prob, _odds_attr in [("1", hw, getattr(match, "odds_home", None)),
+                                        ("X", d,  getattr(match, "odds_draw", None)),
+                                        ("2", aw, getattr(match, "odds_away", None))]:
+            _odds = _odds_attr  # already the float value
+            if _odds and _prob > 0:
+                implied = 1.0 / _odds
+                if _prob > implied * 1.03:  # 3% edge threshold
+                    is_value = True
+                    break
+        # Fallback when odds unavailable: require clear probability edge + minimum confidence
+        if not is_value and primary_odds is None:
             if best_1x2_prob >= 0.52 and confidence >= 45:
                 is_value = True
 
