@@ -12,5 +12,6 @@ export const predictionsService = {
   getAnalysis: (id: number) => apiClient.get(`/predictions/${id}/analysis`),
   getPreMatch: (id: number) => apiClient.get(`/predictions/${id}/pre-match`),
   getOddsHistory: (id: number) => apiClient.get(`/predictions/${id}/odds-history`),
+  getInjuryImpact: (id: number) => apiClient.get(`/predictions/${id}/injury-impact`),
   generate: (matchId: number) => apiClient.post(`/predictions/generate/${matchId}`),
 };

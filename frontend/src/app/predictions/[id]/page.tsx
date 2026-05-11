@@ -20,6 +20,7 @@ import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { PlayerCardModal } from "@/components/ui/PlayerCardModal";
 import { MatchIntelligencePanel } from "@/components/predictions/MatchIntelligencePanel";
 import { OddsTracker } from "@/components/predictions/OddsTracker";
+import { InjuryImpactCenter } from "@/components/predictions/InjuryImpactCenter";
 // Charts are below-the-fold — lazy loaded to reduce initial bundle
 const TeamRadarChart = dynamic(
   () => import("@/components/analytics/TeamRadarChart").then((m) => ({ default: m.TeamRadarChart })),
@@ -503,7 +504,14 @@ export default function PredictionDetailPage({ params }: { params: { id: string 
         )}
       </div>
 
-      {/* Injuries / Suspensions */}
+      {/* Injury Impact Center — FPL xG-powered (Premier League) */}
+      <InjuryImpactCenter
+        predictionId={predId}
+        homeTeam={m.home_team.name}
+        awayTeam={m.away_team.name}
+      />
+
+      {/* Injuries / Suspensions — detailed player list */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="glass-card p-5">
           <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">

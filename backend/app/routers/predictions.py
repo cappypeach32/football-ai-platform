@@ -543,3 +543,143 @@ async def generate_prediction(
     await db.commit()
     await db.refresh(prediction)
     return prediction
+
+
+# ─── Injury Impact Center ─────────────────────────────────────────────────────
+
+from app.data_engine.sources import fpl as _fpl_src
+
+
+class AbsentPlayer(_BaseModel):
+    web_name: str
+    position: str
+    status: str
+    xg: float
+    xa: float
+    ict_index: float
+    threat: float
+    influence: float
+    minutes: int
+    now_cost: int
+    chance_of_playing: int | None
+
+
+class TeamInjuryImpact(_BaseModel):
+    team: str
+    absent_count: int
+    missing_xg: float
+    missing_xa: float
+    missing_xg_pct: float
+    most_impactful: str | None
+    most_impactful_pos: str | None
+    most_impactful_xg: float
+    defenders_out: int
+    impact_level: str   # "LOW" | "MEDIUM" | "HIGH"
+    prob_shift: float   # estimated win probability change in pp
+    absent_players: list[AbsentPlayer]
+
+
+class InjuryImpactResponse(_BaseModel):
+    prediction_id: int
+    league_slug: str
+    is_pl_only: bool
+    home: TeamInjuryImpact | None
+    away: TeamInjuryImpact | None
+
+
+@router.get("/{prediction_id}/injury-impact", response_model=InjuryImpactResponse)
+async def get_injury_impact(
+    prediction_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Injury Impact Center: for each team compute missing xG, most impactful absence,
+    defensive gaps, and estimated probability shift caused by current injuries.
+    Premier League only (FPL data). Other leagues return empty impact objects.
+    """
+    import asyncio as _ai
+
+    q = (
+        select(Prediction)
+        .options(
+            selectinload(Prediction.match).selectinload(Match.league),
+            selectinload(Prediction.match).selectinload(Match.home_team),
+            selectinload(Prediction.match).selectinload(Match.away_team),
+        )
+        .where(Prediction.id == prediction_id)
+    )
+    result = await db.execute(q)
+    pred = result.scalar_one_or_none()
+    if not pred:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+
+    match = pred.match
+    league_slug = match.league.external_id or ""
+    is_pl = league_slug == "ENG.1"
+
+    if not is_pl:
+        empty = TeamInjuryImpact(
+            team="",
+            absent_count=0,
+            missing_xg=0.0,
+            missing_xa=0.0,
+            missing_xg_pct=0.0,
+            most_impactful=None,
+            most_impactful_pos=None,
+            most_impactful_xg=0.0,
+            defenders_out=0,
+            impact_level="LOW",
+            prob_shift=0.0,
+            absent_players=[],
+        )
+        return InjuryImpactResponse(
+            prediction_id=prediction_id,
+            league_slug=league_slug,
+            is_pl_only=True,
+            home=empty,
+            away=empty,
+        )
+
+    home_raw, away_raw = await _ai.gather(
+        _fpl_src.fetch_injury_impact(match.home_team.name),
+        _fpl_src.fetch_injury_impact(match.away_team.name),
+    )
+
+    def _build(raw: dict, team_name: str) -> TeamInjuryImpact:
+        if not raw:
+            return TeamInjuryImpact(
+                team=team_name,
+                absent_count=0,
+                missing_xg=0.0,
+                missing_xa=0.0,
+                missing_xg_pct=0.0,
+                most_impactful=None,
+                most_impactful_pos=None,
+                most_impactful_xg=0.0,
+                defenders_out=0,
+                impact_level="LOW",
+                prob_shift=0.0,
+                absent_players=[],
+            )
+        return TeamInjuryImpact(
+            team=raw.get("team", team_name),
+            absent_count=raw["absent_count"],
+            missing_xg=raw["missing_xg"],
+            missing_xa=raw["missing_xa"],
+            missing_xg_pct=raw["missing_xg_pct"],
+            most_impactful=raw.get("most_impactful"),
+            most_impactful_pos=raw.get("most_impactful_pos"),
+            most_impactful_xg=raw.get("most_impactful_xg", 0.0),
+            defenders_out=raw["defenders_out"],
+            impact_level=raw["impact_level"],
+            prob_shift=raw["prob_shift"],
+            absent_players=[AbsentPlayer(**p) for p in raw.get("absent_players", [])],
+        )
+
+    return InjuryImpactResponse(
+        prediction_id=prediction_id,
+        league_slug=league_slug,
+        is_pl_only=True,
+        home=_build(home_raw, match.home_team.name),
+        away=_build(away_raw, match.away_team.name),
+    )

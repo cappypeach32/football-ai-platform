@@ -510,6 +510,16 @@ class FPLSource:
                 "status": _FPL_STATUS_MAP.get(status, status),
                 "news": news,
                 "chance_of_playing": p.get("chance_of_playing_next_round"),
+                # xG / attacking / defensive stats from FPL
+                "expected_goals":   float(p.get("expected_goals") or 0),
+                "expected_assists": float(p.get("expected_assists") or 0),
+                "goals_scored":     int(p.get("goals_scored") or 0),
+                "assists":          int(p.get("assists") or 0),
+                "minutes":          int(p.get("minutes") or 0),
+                "ict_index":        float(p.get("ict_index") or 0),
+                "threat":           float(p.get("threat") or 0),
+                "influence":        float(p.get("influence") or 0),
+                "now_cost":         int(p.get("now_cost") or 0),   # in tenths: 140 = £14.0m
                 # FPL CDN URL kept as fallback (may 403 for non-English players)
                 "_fpl_photo_code": fpl_photo_code,
             })
@@ -529,6 +539,121 @@ class FPLSource:
                 r["photo"] = None
 
         return results
+
+    async def fetch_injury_impact(self, team_name: str) -> dict:
+        """
+        Compute team-level injury impact metrics from FPL player stats.
+        Returns a structured dict suitable for the Injury Impact Center UI.
+        Only works for Premier League teams (FPL data).
+        """
+        data = await self._bootstrap()
+        if not data:
+            return {}
+
+        fpl_teams = {t["id"]: t["name"] for t in data.get("teams", [])}
+        team_id = self._match_team(team_name, fpl_teams)
+        if not team_id:
+            return {}
+
+        position_map = {et["id"]: et["singular_name"] for et in data.get("element_types", [])}
+        transfer_kw = {"loan", "joined", "released", "terminated", "transfer"}
+
+        import re
+        from datetime import date, datetime
+
+        _RETURN_DATE_RE = re.compile(r"Expected back (\d{1,2} \w{3})", re.IGNORECASE)
+
+        def _is_stale(news: str) -> bool:
+            m = _RETURN_DATE_RE.search(news)
+            if not m:
+                return False
+            try:
+                today = date.today()
+                raw = m.group(1) + f" {today.year}"
+                expected = datetime.strptime(raw, "%d %b %Y").date()
+                if (expected - today).days > 180:
+                    expected = expected.replace(year=today.year - 1)
+                return (today - expected).days > 7
+            except ValueError:
+                return False
+
+        all_players = [p for p in data.get("elements", []) if p["team"] == team_id]
+        team_xg_total = sum(float(p.get("expected_goals") or 0) for p in all_players)
+
+        absent: list[dict] = []
+        for p in all_players:
+            status = p.get("status", "a")
+            if status == "a":
+                continue
+            news: str = p.get("news") or ""
+            if any(kw in news.lower() for kw in transfer_kw):
+                continue
+            if status not in ("i", "d", "s"):
+                continue
+            if _is_stale(news):
+                continue
+            pos = position_map.get(p.get("element_type", 0), "")
+            absent.append({
+                "web_name": p.get("web_name", ""),
+                "position": pos,
+                "status": _FPL_STATUS_MAP.get(status, status),
+                "xg": round(float(p.get("expected_goals") or 0), 2),
+                "xa": round(float(p.get("expected_assists") or 0), 2),
+                "ict_index": float(p.get("ict_index") or 0),
+                "threat": float(p.get("threat") or 0),
+                "influence": float(p.get("influence") or 0),
+                "minutes": int(p.get("minutes") or 0),
+                "now_cost": int(p.get("now_cost") or 0),
+                "chance_of_playing": p.get("chance_of_playing_next_round"),
+            })
+
+        if not absent:
+            return {
+                "team": team_name,
+                "absent_count": 0,
+                "missing_xg": 0.0,
+                "missing_xa": 0.0,
+                "missing_xg_pct": 0.0,
+                "most_impactful": None,
+                "most_impactful_pos": None,
+                "most_impactful_xg": 0.0,
+                "defenders_out": 0,
+                "impact_level": "LOW",
+                "prob_shift": 0.0,
+                "absent_players": [],
+            }
+
+        missing_xg = round(sum(p["xg"] for p in absent), 2)
+        missing_xa = round(sum(p["xa"] for p in absent), 2)
+        missing_xg_pct = round((missing_xg / team_xg_total * 100) if team_xg_total > 0 else 0, 1)
+
+        most_impactful = max(absent, key=lambda p: p["ict_index"])
+        defenders_out = sum(1 for p in absent if "efender" in p["position"] or "oalkeeper" in p["position"])
+
+        # Estimated win probability shift: each 1% of team xG missing ≈ -0.3% prob
+        prob_shift = round(-missing_xg_pct * 0.3, 1)
+
+        if missing_xg >= 3.0 or missing_xg_pct >= 20 or (defenders_out >= 2 and missing_xg >= 1.5):
+            impact_level = "HIGH"
+        elif missing_xg >= 1.5 or missing_xg_pct >= 10:
+            impact_level = "MEDIUM"
+        else:
+            impact_level = "LOW"
+
+        return {
+            "team": team_name,
+            "absent_count": len(absent),
+            "missing_xg": missing_xg,
+            "missing_xa": missing_xa,
+            "missing_xg_pct": missing_xg_pct,
+            "most_impactful": most_impactful["web_name"],
+            "most_impactful_pos": most_impactful["position"],
+            "most_impactful_xg": round(most_impactful["xg"], 2),
+            "defenders_out": defenders_out,
+            "impact_level": impact_level,
+            "prob_shift": prob_shift,
+            "absent_players": absent,
+        }
 
     async def aclose(self) -> None:
         if self._client and not self._client.is_closed:
