@@ -101,6 +101,7 @@ async def hero_prediction(
     today = from_date or date.today()
 
     date_floor = datetime.combine(today, dtime(0, 0, 0))
+    date_ceil  = datetime.combine(today, dtime(23, 59, 59))
     in_play_cutoff = datetime.utcnow() - timedelta(hours=3)
     cutoff = max(in_play_cutoff, date_floor)
 
@@ -114,6 +115,7 @@ async def hero_prediction(
         )
         .where(
             Match.match_date >= cutoff,
+            Match.match_date <= date_ceil,
             Prediction.value_bet == True,
             # Must have market odds to compute an edge
             or_(
@@ -128,7 +130,7 @@ async def hero_prediction(
     result = await db.execute(q)
     pred = result.scalars().first()
 
-    # Fallback: best prediction without value_bet filter if nothing qualifies
+    # Fallback: best prediction without value_bet filter if nothing qualifies today
     if pred is None:
         q2 = (
             select(Prediction)
@@ -140,6 +142,7 @@ async def hero_prediction(
             )
             .where(
                 Match.match_date >= cutoff,
+                Match.match_date <= date_ceil,
                 Prediction.confidence_score >= 60,
             )
             .order_by(desc(Prediction.confidence_score))
