@@ -6,6 +6,7 @@ import { predictionsApi, analyticsApi } from "@/lib/api";
 import { StatsOverviewBar } from "@/components/dashboard/StatsOverviewBar";
 
 import { AIAlertsBanner } from "@/components/dashboard/AIAlertsBanner";
+import { IntelligenceFeed } from "@/components/dashboard/IntelligenceFeed";
 import { DailyOverviewCard } from "@/components/dashboard/DailyOverviewCard";
 import { HeroPickCard, HeroPickCardSkeleton } from "@/components/dashboard/HeroPickCard";
 import type { Prediction } from "@/types";
@@ -58,6 +59,9 @@ export default function DashboardPage() {
           All Predictions <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </motion.div>
+
+      {/* Live Intelligence Feed */}
+      <IntelligenceFeed />
 
       {/* AI Alerts */}
       <AIAlertsBanner />

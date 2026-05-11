@@ -208,3 +208,190 @@ async def daily_summary(db: AsyncSession = Depends(get_db)):
         "roi_today": summary["roi"],
         "profit_loss_today": summary["total_profit_loss"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Live Intelligence Feed
+# ---------------------------------------------------------------------------
+
+_INTEL_LEAGUES = [
+    ("eng.1",                 "Premier League"),
+    ("esp.1",                 "La Liga"),
+    ("ger.1",                 "Bundesliga"),
+    ("ita.1",                 "Serie A"),
+    ("fra.1",                 "Ligue 1"),
+    ("uefa.champions_league", "Champions League"),
+    ("UEFA.EUROPA",           "Europa League"),
+    ("UEFA.EUROPA.CONF",      "Conference League"),
+]
+
+
+def _us_to_dec(s: str | None) -> float | None:
+    """Convert American odds string (e.g. '+235', '-130') to decimal odds."""
+    try:
+        v = int(str(s).replace(" ", ""))
+        return round((v / 100 + 1) if v > 0 else (100 / abs(v) + 1), 4)
+    except Exception:
+        return None
+
+
+def _implied_prob(dec: float | None) -> float | None:
+    return round(100.0 / dec, 1) if dec and dec > 1.0 else None
+
+
+@router.get("/intelligence")
+async def get_intelligence_signals(
+    from_date: date | None = Query(None),
+):
+    """
+    Live Intelligence Feed: real-time signals derived from ESPN odds movement
+    (open vs close) and FPL injury data.  No paid API required.
+    """
+    import aiohttp
+    import asyncio
+    import certifi
+    import ssl as _ssl
+
+    ssl_ctx = _ssl.create_default_context(cafile=certifi.where())
+
+    async def fetch_league(sess: aiohttp.ClientSession, slug: str):
+        url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard"
+        try:
+            async with sess.get(url, ssl=ssl_ctx,
+                                timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status != 200:
+                    return slug, []
+                data = await resp.json(content_type=None)
+                return slug, data.get("events", [])
+        except Exception:
+            return slug, []
+
+    signals: list[dict] = []
+    pl_teams_today: list[str] = []
+
+    async with aiohttp.ClientSession() as sess:
+        results = await asyncio.gather(
+            *[fetch_league(sess, slug) for slug, _ in _INTEL_LEAGUES]
+        )
+
+    league_name_map = {slug: name for slug, name in _INTEL_LEAGUES}
+
+    for (slug, _), (_, events) in zip(_INTEL_LEAGUES, results):
+        league_name = league_name_map[slug]
+        for event in events:
+            comps = event.get("competitions", [])
+            if not comps:
+                continue
+            comp = comps[0]
+            competitors = comp.get("competitors", [])
+            home = next(
+                (c["team"].get("displayName", "Home")
+                 for c in competitors if c.get("homeAway") == "home"), "Home"
+            )
+            away = next(
+                (c["team"].get("displayName", "Away")
+                 for c in competitors if c.get("homeAway") == "away"), "Away"
+            )
+            match_name = f"{home} vs {away}"
+            start_iso = comp.get("startDate", "")
+
+            if slug == "eng.1":
+                pl_teams_today.extend([home, away])
+
+            odds_list = comp.get("odds", [])
+            if not odds_list:
+                continue
+            odds = odds_list[0]
+            if not odds:
+                continue
+
+            # --- 1X2 moneyline movement ---
+            ml = odds.get("moneyline", {})
+            for side, team in [("home", home), ("away", away)]:
+                ml_s = ml.get(side, {})
+                open_dec  = _us_to_dec(ml_s.get("open",  {}).get("odds"))
+                close_dec = _us_to_dec(ml_s.get("close", {}).get("odds"))
+                if not open_dec or not close_dec:
+                    continue
+                op = _implied_prob(open_dec)
+                cp = _implied_prob(close_dec)
+                if op is None or cp is None:
+                    continue
+                delta = round(cp - op, 1)
+                if abs(delta) < 5.0:
+                    continue
+                o_str = ml_s.get("open",  {}).get("odds", "?")
+                c_str = ml_s.get("close", {}).get("odds", "?")
+                signals.append({
+                    "id": f"odds_{event['id']}_{side}",
+                    "type": "odds_movement",
+                    "priority": "high" if abs(delta) >= 10 else "medium",
+                    "match": match_name,
+                    "league": league_name,
+                    "title": f"Sharp money on {team}",
+                    "detail": f"Odds {o_str} → {c_str} · prob {'+' if delta > 0 else ''}{delta:.1f}%",
+                    "prob_delta": delta,
+                    "match_time": start_iso,
+                })
+
+            # --- Over/Under totals movement ---
+            total = odds.get("total", {})
+            over_open_dec  = _us_to_dec(total.get("over", {}).get("open",  {}).get("odds"))
+            over_close_dec = _us_to_dec(total.get("over", {}).get("close", {}).get("odds"))
+            if over_open_dec and over_close_dec:
+                op = _implied_prob(over_open_dec)
+                cp = _implied_prob(over_close_dec)
+                if op and cp:
+                    delta = round(cp - op, 1)
+                    if abs(delta) >= 5.0:
+                        direction = "Over 2.5" if delta > 0 else "Under 2.5"
+                        o_str = total.get("over", {}).get("open",  {}).get("odds", "?")
+                        c_str = total.get("over", {}).get("close", {}).get("odds", "?")
+                        signals.append({
+                            "id": f"goals_{event['id']}",
+                            "type": "goals_signal",
+                            "priority": "medium",
+                            "match": match_name,
+                            "league": league_name,
+                            "title": f"Goals market: {direction} favoured",
+                            "detail": f"Over 2.5 {o_str} → {c_str} · prob {'+' if delta > 0 else ''}{delta:.1f}%",
+                            "prob_delta": delta,
+                            "match_time": start_iso,
+                        })
+
+    # --- FPL injury signals for PL teams playing today ---
+    try:
+        from app.data_engine.sources import fpl as _fpl
+        seen: set[str] = set()
+        for team_name in list(set(pl_teams_today))[:8]:
+            injuries = await _fpl.fetch_injuries(team_name)
+            for inj in injuries[:3]:
+                if inj.get("status") not in ("Injured", "Doubtful"):
+                    continue
+                key = inj.get("web_name", "")
+                if key in seen:
+                    continue
+                seen.add(key)
+                cost = (inj.get("now_cost") or 0) / 10.0
+                impact = -8 if cost >= 10.0 else (-5 if cost >= 8.0 else -3)
+                signals.append({
+                    "id": f"injury_{team_name}_{key}",
+                    "type": "injury",
+                    "priority": "high" if cost >= 10.0 else "medium",
+                    "match": f"{team_name} — today",
+                    "league": "Premier League",
+                    "title": f"{key} {inj['status'].lower()} ({team_name})",
+                    "detail": f"Win probability impact est. {impact}%",
+                    "prob_delta": impact,
+                    "match_time": None,
+                })
+    except Exception:
+        pass
+
+    # Sort: high priority first, then by magnitude of signal
+    signals.sort(key=lambda s: (
+        0 if s["priority"] == "high" else 1,
+        -abs(s.get("prob_delta", 0))
+    ))
+
+    return signals[:15]

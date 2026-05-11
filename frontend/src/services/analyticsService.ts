@@ -10,5 +10,7 @@ export const analyticsService = {
     apiClient.get("/analytics/comparison", { params: { home_id: homeId, away_id: awayId } }),
   getAlerts: (fromDate?: string) =>
     apiClient.get("/analytics/alerts", { params: fromDate ? { from_date: fromDate } : {} }),
+  getIntelligence: (fromDate?: string) =>
+    apiClient.get("/analytics/intelligence", { params: fromDate ? { from_date: fromDate } : {} }),
   getDailySummary: () => apiClient.get("/analytics/daily-summary"),
 };
