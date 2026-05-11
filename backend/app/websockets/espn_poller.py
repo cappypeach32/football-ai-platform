@@ -148,16 +148,78 @@ async def _sync_to_db(payload: dict[str, Any], state: str) -> None:
                     pass
 
             elif state == "post":
+                was_finished = match.status == MatchStatus.FINISHED
                 match.status = MatchStatus.FINISHED
                 match.home_score = payload["home_score"]
                 match.away_score = payload["away_score"]
                 match.minute = None
+
+                # Settle predictions the first time this match reaches FINISHED
+                if not was_finished:
+                    await _settle_predictions(db, match)
 
             await db.commit()
             logger.debug("espn_db_synced", match_id=match.id, state=state,
                          score=f"{payload['home_score']}-{payload['away_score']}")
     except Exception as exc:
         logger.warning("espn_db_sync_error", error=str(exc))
+
+
+async def _settle_predictions(db: Any, match: Any) -> None:
+    """Evaluate all pending predictions for a finished match and write is_correct + profit_loss."""
+    from app.models.football import Prediction
+    from app.models.enums import PredictionResult
+
+    UNIT_STAKE = 1.0
+
+    home_score = match.home_score or 0
+    away_score = match.away_score or 0
+    total_goals = home_score + away_score
+
+    stmt = select(Prediction).where(
+        Prediction.match_id == match.id,
+        Prediction.result == PredictionResult.PENDING,
+    )
+    result = await db.execute(stmt)
+    preds = result.scalars().all()
+
+    for pred in preds:
+        bet = pred.recommended_bet
+        if bet is None:
+            continue
+
+        # Determine if bet is correct
+        if bet == "1":
+            is_correct = home_score > away_score
+        elif bet == "X":
+            is_correct = home_score == away_score
+        elif bet == "2":
+            is_correct = away_score > home_score
+        elif bet == "over_2.5":
+            is_correct = total_goals > 2.5
+        elif bet == "under_2.5":
+            is_correct = total_goals < 2.5
+        elif bet == "btts_yes":
+            is_correct = home_score > 0 and away_score > 0
+        elif bet == "btts_no":
+            is_correct = home_score == 0 or away_score == 0
+        else:
+            continue
+
+        # Resolve the odds for the recommended bet
+        odds_map = {"1": pred.odds_home, "X": pred.odds_draw, "2": pred.odds_away}
+        odds = odds_map.get(bet)
+
+        pred.is_correct = is_correct
+        pred.result = PredictionResult.WIN if is_correct else PredictionResult.LOSS
+        if odds and odds > 1.0:
+            pred.profit_loss = round((odds - 1) * UNIT_STAKE if is_correct else -UNIT_STAKE, 4)
+        else:
+            pred.profit_loss = round(UNIT_STAKE if is_correct else -UNIT_STAKE, 4)
+
+    if preds:
+        logger.info("predictions_settled", match_id=match.id, count=len(preds),
+                    score=f"{home_score}-{away_score}")
 
 
 async def espn_poll_loop(ws_manager: Any) -> None:
