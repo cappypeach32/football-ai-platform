@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
 from app.database import get_db
 from app.models import Match, MatchStatus, Prediction, PredictionResult, Team, League
@@ -47,10 +47,22 @@ async def team_comparison(home_id: int, away_id: int, db: AsyncSession = Depends
 
 
 @router.get("/alerts")
-async def get_ai_alerts(db: AsyncSession = Depends(get_db)):
+async def get_ai_alerts(
+    from_date: date | None = Query(None, description="Local calendar date floor (YYYY-MM-DD)"),
+    db: AsyncSession = Depends(get_db),
+):
     """Real-time AI alerts: value bets, high confidence picks, injury warnings."""
     now = datetime.now(timezone.utc)
-    window_start = now - timedelta(days=3)   # include recent finished matches too
+    # Floor: start of the user's local calendar day (passed from browser).
+    # Falls back to start of today UTC so past-day matches never bleed through.
+    if from_date:
+        from datetime import time as dtime
+        day_floor = datetime(from_date.year, from_date.month, from_date.day, 0, 0, 0, tzinfo=timezone.utc)
+    else:
+        day_floor = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Keep a 3-hour lookback for in-play matches only (not 3 days)
+    in_play_cutoff = now - timedelta(hours=3)
+    window_start = max(in_play_cutoff, day_floor)
     window_end = now + timedelta(days=7)
 
     # Predictions in window — upcoming scheduled OR recently settled

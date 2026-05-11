@@ -57,10 +57,11 @@ function TypewriterText({ text, speed = 18, delay = 300 }: { text: string; speed
 
 export function AIAlertsBanner() {
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local date
 
   const { data: alerts = [] } = useQuery<Alert[]>({
-    queryKey: ["analytics", "alerts"],
-    queryFn: () => analyticsApi.getAlerts().then((r) => r.data),
+    queryKey: ["analytics", "alerts", today],
+    queryFn: () => analyticsApi.getAlerts(today).then((r) => r.data),
     refetchInterval: 5 * 60 * 1000,
     staleTime: 2 * 60 * 1000,
   });
