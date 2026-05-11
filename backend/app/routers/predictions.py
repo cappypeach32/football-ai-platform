@@ -573,9 +573,13 @@ class TeamInjuryImpact(_BaseModel):
     most_impactful: str | None
     most_impactful_pos: str | None
     most_impactful_xg: float
+    most_impactful_role: str | None
     defenders_out: int
-    impact_level: str   # "LOW" | "MEDIUM" | "HIGH"
-    prob_shift: float   # estimated win probability change in pp
+    attack_impact: str          # "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+    defensive_stability_pct: int  # e.g. -18
+    impact_level: str           # "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+    prob_shift: float           # estimated win probability change in pp
+    ai_summary: str
     absent_players: list[AbsentPlayer]
 
 
@@ -627,9 +631,13 @@ async def get_injury_impact(
             most_impactful=None,
             most_impactful_pos=None,
             most_impactful_xg=0.0,
+            most_impactful_role=None,
             defenders_out=0,
+            attack_impact="LOW",
+            defensive_stability_pct=0,
             impact_level="LOW",
             prob_shift=0.0,
+            ai_summary="Injury data not available for this league.",
             absent_players=[],
         )
         return InjuryImpactResponse(
@@ -656,9 +664,13 @@ async def get_injury_impact(
                 most_impactful=None,
                 most_impactful_pos=None,
                 most_impactful_xg=0.0,
+                most_impactful_role=None,
                 defenders_out=0,
+                attack_impact="LOW",
+                defensive_stability_pct=0,
                 impact_level="LOW",
                 prob_shift=0.0,
+                ai_summary="No injury data available.",
                 absent_players=[],
             )
         return TeamInjuryImpact(
@@ -670,9 +682,13 @@ async def get_injury_impact(
             most_impactful=raw.get("most_impactful"),
             most_impactful_pos=raw.get("most_impactful_pos"),
             most_impactful_xg=raw.get("most_impactful_xg", 0.0),
+            most_impactful_role=raw.get("most_impactful_role"),
             defenders_out=raw["defenders_out"],
+            attack_impact=raw.get("attack_impact", "LOW"),
+            defensive_stability_pct=raw.get("defensive_stability_pct", 0),
             impact_level=raw["impact_level"],
             prob_shift=raw["prob_shift"],
+            ai_summary=raw.get("ai_summary", ""),
             absent_players=[AbsentPlayer(**p) for p in raw.get("absent_players", [])],
         )
 

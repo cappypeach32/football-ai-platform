@@ -630,15 +630,100 @@ class FPLSource:
         most_impactful = max(absent, key=lambda p: p["ict_index"])
         defenders_out = sum(1 for p in absent if "efender" in p["position"] or "oalkeeper" in p["position"])
 
-        # Estimated win probability shift: each 1% of team xG missing ≈ -0.3% prob
-        prob_shift = round(-missing_xg_pct * 0.3, 1)
+        # ── Attack impact level ────────────────────────────────────────────────
+        attackers_midfielders_out = [p for p in absent if "orward" in p["position"] or "idfielder" in p["position"]]
+        attacking_xg_lost = sum(p["xg"] for p in attackers_midfielders_out)
+        if attacking_xg_lost >= 4.0 or missing_xg_pct >= 28:
+            attack_impact = "CRITICAL"
+        elif attacking_xg_lost >= 2.5 or missing_xg_pct >= 18:
+            attack_impact = "HIGH"
+        elif attacking_xg_lost >= 1.2 or missing_xg_pct >= 10:
+            attack_impact = "MEDIUM"
+        else:
+            attack_impact = "LOW"
 
-        if missing_xg >= 3.0 or missing_xg_pct >= 20 or (defenders_out >= 2 and missing_xg >= 1.5):
+        # ── Defensive stability % hit ──────────────────────────────────────────
+        # Weight by influence score of missing defenders; each influential defender ≈ -7%
+        def_influence_total = sum(p["influence"] for p in absent if "efender" in p["position"] or "oalkeeper" in p["position"])
+        # Normalise: a typical solid defender has ~500 influence over a season
+        defensive_stability_pct = round(-min(def_influence_total / 500 * 7, 35), 0)
+
+        # ── Overall impact level ───────────────────────────────────────────────
+        if missing_xg >= 4.0 or missing_xg_pct >= 25 or (defenders_out >= 3):
+            impact_level = "CRITICAL"
+        elif missing_xg >= 3.0 or missing_xg_pct >= 18 or (defenders_out >= 2 and missing_xg >= 1.5):
             impact_level = "HIGH"
         elif missing_xg >= 1.5 or missing_xg_pct >= 10:
             impact_level = "MEDIUM"
         else:
             impact_level = "LOW"
+
+        # ── Estimated win probability shift ───────────────────────────────────
+        prob_shift = round(-missing_xg_pct * 0.3, 1)
+
+        # ── Most impactful player role description ────────────────────────────
+        def _derive_role(player: dict) -> str:
+            pos = player.get("position", "")
+            threat = player.get("threat", 0)
+            creativity = player.get("ict_index", 0) - player.get("threat", 0) / 10
+            influence = player.get("influence", 0)
+            xg = player.get("xg", 0)
+            if "oalkeeper" in pos:
+                return "Starting goalkeeper"
+            if "efender" in pos:
+                return "Defensive anchor" if influence >= 400 else "Key defender"
+            if "idfielder" in pos:
+                if threat >= 150:
+                    return "Attacking midfielder"
+                if creativity >= 7:
+                    return "Primary creator"
+                return "Box-to-box midfielder"
+            if "orward" in pos:
+                return "Top scorer" if xg >= 3 else "Lead striker"
+            return "Key player"
+
+        most_impactful_role = _derive_role(most_impactful)
+
+        # ── AI summary ────────────────────────────────────────────────────────
+        def _build_summary() -> str:
+            name = most_impactful["web_name"]
+            role = most_impactful_role.lower()
+            total = len(absent)
+            atk_out = len(attackers_midfielders_out)
+
+            if attack_impact == "CRITICAL":
+                return (
+                    f"{team_name} face a severely weakened attack with {atk_out} forward/midfield player{'s' if atk_out != 1 else ''} unavailable, "
+                    f"including {name} ({role}). Expect significantly reduced offensive output and transition threat."
+                )
+            if attack_impact == "HIGH" and defenders_out >= 2:
+                return (
+                    f"Significant disruption across both lines for {team_name}. "
+                    f"The absence of {name} ({role}) alongside {defenders_out} defensive absentees creates structural vulnerability."
+                )
+            if attack_impact in ("HIGH", "CRITICAL"):
+                return (
+                    f"{team_name} attacking efficiency reduced. {name} ({role}) is the most critical absence — "
+                    f"expect lower scoring opportunities and reduced set-piece threat."
+                )
+            if defenders_out >= 2:
+                return (
+                    f"{team_name} defensive organisation under strain with {defenders_out} key defensive players out. "
+                    f"Increased exposure to counter-attacks and set-pieces expected."
+                )
+            if total >= 4:
+                return (
+                    f"Squad depth tested for {team_name} with {total} players unavailable. "
+                    f"Rotation fatigue and tactical flexibility may be compromised."
+                )
+            if total >= 1:
+                return (
+                    f"{team_name} missing {name} ({role}). "
+                    f"Moderate impact on tactical shape — squad depth should compensate adequately."
+                )
+            return f"No significant injury disruption for {team_name}. Full tactical options available."
+
+        ai_summary = _build_summary()
 
         return {
             "team": team_name,
@@ -649,9 +734,13 @@ class FPLSource:
             "most_impactful": most_impactful["web_name"],
             "most_impactful_pos": most_impactful["position"],
             "most_impactful_xg": round(most_impactful["xg"], 2),
+            "most_impactful_role": most_impactful_role,
             "defenders_out": defenders_out,
+            "attack_impact": attack_impact,
+            "defensive_stability_pct": int(defensive_stability_pct),
             "impact_level": impact_level,
             "prob_shift": prob_shift,
+            "ai_summary": ai_summary,
             "absent_players": absent,
         }
 
