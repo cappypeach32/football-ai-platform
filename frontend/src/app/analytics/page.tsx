@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { analyticsApi } from "@/lib/api";
 import { LeagueStatsTable } from "@/components/analytics/LeagueStatsTable";
 import { OverviewCharts } from "@/components/analytics/OverviewCharts";
+import { SettledPredictionsTable } from "@/components/analytics/SettledPredictionsTable";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -90,6 +91,9 @@ export default function AnalyticsPage() {
             </div>
             <LeagueStatsTable />
           </motion.div>
+
+          {/* Settled predictions log */}
+          <SettledPredictionsTable />
         </>
       )}
     </div>

@@ -126,3 +126,23 @@ async def _update_live():
                 "stats": match.stats or {},
             }
             await ws_manager.broadcast(match.id, state)
+
+
+@celery_app.task(name="app.tasks.prediction_tasks.reconcile_finished_predictions")
+def reconcile_finished_predictions():
+    """Settle predictions for recently finished matches and update ROI."""
+    try:
+        asyncio.run(_reconcile())
+    except Exception as exc:
+        logger.error("reconcile_failed", error=str(exc))
+
+
+async def _reconcile():
+    from app.database import AsyncSessionLocal
+    from app.services.backtest_service import BacktestService
+
+    async with AsyncSessionLocal() as db:
+        service = BacktestService(db)
+        result = await service.reconcile_results()
+        if result.get("updated", 0) > 0:
+            logger.info("reconcile_completed", **result)

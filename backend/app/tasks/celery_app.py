@@ -27,5 +27,9 @@ celery_app.conf.update(
             "task": "app.tasks.prediction_tasks.update_live_matches",
             "schedule": 60.0,
         },
+        "reconcile-finished-predictions-every-5-minutes": {
+            "task": "app.tasks.prediction_tasks.reconcile_finished_predictions",
+            "schedule": 300.0,
+        },
     },
 )

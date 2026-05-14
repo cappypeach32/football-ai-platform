@@ -11,6 +11,62 @@ from app.schemas import AnalyticsOverview
 router = APIRouter()
 
 
+@router.get("/settled-predictions")
+async def settled_predictions(
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return settled predictions (win/loss) with full match and ROI context."""
+    q = (
+        select(Prediction)
+        .join(Prediction.match)
+        .where(Prediction.result != PredictionResult.PENDING)
+        .options(
+            selectinload(Prediction.match).selectinload(Match.home_team),
+            selectinload(Prediction.match).selectinload(Match.away_team),
+            selectinload(Prediction.match).selectinload(Match.league),
+        )
+        .order_by(Match.match_date.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(q)
+    preds = result.scalars().all()
+
+    rows = []
+    for p in preds:
+        m = p.match
+        rows.append({
+            "prediction_id": p.id,
+            "match_id": m.id,
+            "home_team": m.home_team.name if m.home_team else "—",
+            "away_team": m.away_team.name if m.away_team else "—",
+            "league": m.league.name if m.league else "—",
+            "match_date": m.match_date.isoformat() if m.match_date else None,
+            "score": f"{m.home_score}–{m.away_score}" if m.home_score is not None else None,
+            "recommended_bet": p.recommended_bet,
+            "result": p.result.value if p.result else None,
+            "is_correct": p.is_correct,
+            "odds": (
+                p.odds_home if p.recommended_bet == "1"
+                else p.odds_draw if p.recommended_bet == "X"
+                else p.odds_away if p.recommended_bet == "2"
+                else None
+            ),
+            "profit_loss": round(p.profit_loss, 4) if p.profit_loss is not None else None,
+            "confidence_score": round(p.confidence_score, 3) if p.confidence_score else None,
+            "value_bet": p.value_bet,
+        })
+
+    # Running totals for the returned rows
+    total_pl = sum(r["profit_loss"] for r in rows if r["profit_loss"] is not None)
+    settled_count = len([r for r in rows if r["profit_loss"] is not None])
+    roi = round((total_pl / settled_count) * 100, 2) if settled_count else 0.0
+
+    return {"predictions": rows, "total": settled_count, "roi": roi, "total_pl": round(total_pl, 4)}
+
+
 @router.get("/overview", response_model=AnalyticsOverview)
 async def analytics_overview(db: AsyncSession = Depends(get_db)):
     from app.services.analytics_service import AnalyticsService

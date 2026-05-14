@@ -86,7 +86,10 @@ class Match(Base):
     home_team_id: Mapped[int] = mapped_column(Integer, ForeignKey("teams.id"))
     away_team_id: Mapped[int] = mapped_column(Integer, ForeignKey("teams.id"))
     match_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    status: Mapped[MatchStatus] = mapped_column(SAEnum(MatchStatus), default=MatchStatus.SCHEDULED)
+    status: Mapped[MatchStatus] = mapped_column(
+        SAEnum(MatchStatus, native_enum=False, values_callable=lambda x: [e.value for e in x]),
+        default=MatchStatus.SCHEDULED,
+    )
     home_score: Mapped[int | None] = mapped_column(Integer)
     away_score: Mapped[int | None] = mapped_column(Integer)
     home_score_ht: Mapped[int | None] = mapped_column(Integer)

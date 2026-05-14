@@ -47,7 +47,7 @@ class Prediction(Base):
     odds_draw: Mapped[float | None] = mapped_column(Float)
     odds_away: Mapped[float | None] = mapped_column(Float)
 
-    result: Mapped[PredictionResult] = mapped_column(SAEnum(PredictionResult), default=PredictionResult.PENDING)
+    result: Mapped[PredictionResult] = mapped_column(SAEnum(PredictionResult, native_enum=False, values_callable=lambda x: [e.value for e in x]), default=PredictionResult.PENDING)
     is_correct: Mapped[bool | None] = mapped_column(Boolean)
     profit_loss: Mapped[float | None] = mapped_column(Float)
     market_results: Mapped[dict | None] = mapped_column(JSON)

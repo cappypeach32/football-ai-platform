@@ -15,4 +15,6 @@ export const analyticsService = {
   getDailySummary: () => apiClient.get("/analytics/daily-summary"),
   getDailyReport: () => apiClient.get("/analytics/daily-report"),
   getLeagueIntelligence: (externalId: string) => apiClient.get(`/analytics/leagues/${externalId}/intelligence`),
+  getSettledPredictions: (limit = 50, offset = 0) =>
+    apiClient.get("/analytics/settled-predictions", { params: { limit, offset } }),
 };
