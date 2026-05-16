@@ -68,6 +68,7 @@ services:
   - type: redis
     name: football-ai-redis
     maxmemoryPolicy: noeviction
+    ipAllowList: []
 
 # ─── Postgres ───────────────────────────────────────────────────────────────
 databases:
