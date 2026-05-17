@@ -70,9 +70,10 @@ async def list_predictions(
         ))
         if not upcoming_only:
             # When fetching all (including past), sort closest to now first
+            # Use PostgreSQL-compatible EXTRACT(EPOCH FROM ...) instead of SQLite strftime
             now_ts = datetime.utcnow().timestamp()
             q = q.order_by(
-                func.abs(func.strftime("%s", Match.match_date) - now_ts),
+                func.abs(func.extract("epoch", Match.match_date) - now_ts),
                 desc(Prediction.confidence_score),
             )
         else:
