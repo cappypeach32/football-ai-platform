@@ -29,9 +29,9 @@ async def _fetch_features(match: Match, session):
         get_h2h(home_ext, away_ext, league_slug),
     )
 
-    home_rest, away_rest = await asyncio.gather(
-        get_schedule_congestion(home_ext, session),
-        get_schedule_congestion(away_ext, session),
+    home_rest, away_rest = (
+        await get_schedule_congestion(home_ext, session),
+        await get_schedule_congestion(away_ext, session),
     )
 
     venue   = getattr(match, "venue", None)
@@ -77,6 +77,7 @@ async def main():
             try:
                 features  = await _fetch_features(match, session)
                 pred_data = await engine.predict(match, features)
+                pred_data.pop("top_scores", None)
                 prediction = Prediction(match_id=match.id, **pred_data)
                 session.add(prediction)
                 xgb_tag = " [XGB]" if features else ""

@@ -394,7 +394,7 @@ async def get_team_form(team_external_id: str, league_slug: str, team_name: str 
 
     cached = await cache.get_team_form(team_id, league_slug)
     if cached is not None:
-        return cached
+        return [TeamFormEntry(**e) if isinstance(e, dict) else e for e in cached]
 
     raw_events = await espn.fetch_team_schedule(team_id, league_slug)
     form: list[TeamFormEntry] = []
@@ -457,7 +457,7 @@ async def get_h2h(
 
     cached = await cache.get_h2h(home_id, away_id, league_slug)
     if cached is not None:
-        return cached
+        return [H2HResult(**e) if isinstance(e, dict) else e for e in cached]
 
     raw_events = await espn.fetch_team_schedule(home_id, league_slug)
     h2h: list[H2HResult] = []

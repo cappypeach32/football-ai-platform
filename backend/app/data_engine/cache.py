@@ -160,7 +160,14 @@ class RedisCache:
 
     async def set(self, key: str, value: Any, ttl: int) -> None:
         try:
-            await self._client.setex(key, ttl, json.dumps(value, default=str))
+            from pydantic import BaseModel
+
+            def _default(obj: Any) -> Any:
+                if isinstance(obj, BaseModel):
+                    return obj.model_dump()
+                return str(obj)
+
+            await self._client.setex(key, ttl, json.dumps(value, default=_default))
         except Exception as exc:
             logger.debug("Redis set failed (%s): %s", key, exc)
 
