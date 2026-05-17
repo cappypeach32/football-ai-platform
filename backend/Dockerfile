@@ -18,9 +18,6 @@ COPY . .
 # Create model cache directory
 RUN mkdir -p /app/model_cache
 
-# Make startup script executable
-RUN chmod +x /app/start.sh
-
 EXPOSE 8000
 
-CMD ["/bin/bash", "/app/start.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
