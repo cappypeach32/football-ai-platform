@@ -19,6 +19,10 @@ celery_app.conf.update(
         "app.tasks.analytics_tasks.*": {"queue": "analytics"},
     },
     beat_schedule={
+        "fetch-daily-matches-every-3-hours": {
+            "task": "app.tasks.prediction_tasks.fetch_daily_matches",
+            "schedule": 10800.0,  # every 3 hours
+        },
         "refresh-predictions-hourly": {
             "task": "app.tasks.prediction_tasks.refresh_upcoming_predictions",
             "schedule": 3600.0,

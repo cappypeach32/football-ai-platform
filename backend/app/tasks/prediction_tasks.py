@@ -128,6 +128,26 @@ async def _update_live():
             await ws_manager.broadcast(match.id, state)
 
 
+@celery_app.task(name="app.tasks.prediction_tasks.fetch_daily_matches")
+def fetch_daily_matches():
+    """Fetch today's and tomorrow's matches from ESPN into the database."""
+    try:
+        asyncio.run(_fetch_daily())
+    except Exception as exc:
+        logger.error("fetch_daily_matches_failed", error=str(exc))
+
+
+async def _fetch_daily():
+    from datetime import date, timedelta
+    from app.data_engine.pipeline import ingest_date
+
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    for target_date in [today, tomorrow]:
+        result = await ingest_date(target_date)
+        logger.info("matches_ingested", date=str(target_date), result=str(result))
+
+
 @celery_app.task(name="app.tasks.prediction_tasks.reconcile_finished_predictions")
 def reconcile_finished_predictions():
     """Settle predictions for recently finished matches and update ROI."""
