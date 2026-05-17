@@ -64,6 +64,26 @@ services:
       - key: SECRET_KEY
         sync: false
 
+  # ─── Celery Beat Scheduler ──────────────────────────────────────────────────
+  - type: worker
+    name: football-ai-celery-beat
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: celery -A app.tasks.celery_app beat --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: football-ai-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: football-ai-redis
+          property: connectionString
+      - key: SECRET_KEY
+        sync: false
+
   # ─── Redis ──────────────────────────────────────────────────────────────────
   - type: redis
     name: football-ai-redis
