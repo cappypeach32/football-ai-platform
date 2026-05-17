@@ -169,60 +169,9 @@ async def seed():
                 team = Team(league_id=league.id, country=league.country, **td)
                 session.add(team)
                 team_map[td["name"]] = team
-        await session.flush()
-
-        # ── Matches + Predictions ──
-        now = datetime.now(timezone.utc)
-        for md in SAMPLE_MATCHES:
-            home_team = team_map.get(md["home"])
-            away_team = team_map.get(md["away"])
-            if not home_team or not away_team:
-                print(f"⚠️  Team not found: {md['home']} / {md['away']}")
-                continue
-
-            match_date = now + timedelta(days=md["days_ahead"])
-            match = Match(
-                league_id=home_team.league_id,
-                home_team_id=home_team.id,
-                away_team_id=away_team.id,
-                match_date=match_date,
-                status=md["status"],
-                home_score=md.get("home_score"),
-                away_score=md.get("away_score"),
-                minute=md.get("minute"),
-            )
-            session.add(match)
-            await session.flush()
-
-            # Add prediction for certain matches
-            pred_data = PREDICTIONS.get(md["home"])
-            if pred_data and pred_data.get("away") == md["away"]:
-                prediction = Prediction(
-                    match_id=match.id,
-                    home_win_prob=pred_data["home_win_prob"],
-                    draw_prob=pred_data["draw_prob"],
-                    away_win_prob=pred_data["away_win_prob"],
-                    over_25_prob=pred_data["over_25_prob"],
-                    under_25_prob=pred_data["under_25_prob"],
-                    btts_yes_prob=pred_data["btts_yes_prob"],
-                    btts_no_prob=pred_data["btts_no_prob"],
-                    home_xg=pred_data["home_xg"],
-                    away_xg=pred_data["away_xg"],
-                    confidence_score=pred_data["confidence_score"],
-                    risk_score=pred_data["risk_score"],
-                    value_bet=pred_data["value_bet"],
-                    recommended_bet=pred_data["recommended_bet"].value,
-                    odds_home=pred_data.get("odds_home"),
-                    odds_draw=pred_data.get("odds_draw"),
-                    odds_away=pred_data.get("odds_away"),
-                    ai_summary=pred_data.get("ai_summary"),
-                    key_factors=pred_data.get("key_factors"),
-                    result=PredictionResult.PENDING,
-                )
-                session.add(prediction)
 
         await session.commit()
-        print("✅ Database seeded: 5 leagues, teams, matches, predictions.")
+        print("✅ Database seeded: 5 leagues and teams. Matches come from ESPN via fetch_matches.py.")
 
 
 if __name__ == "__main__":
