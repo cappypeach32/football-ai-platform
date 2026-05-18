@@ -29,8 +29,9 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.data_engine.cache import (
     cache,
@@ -45,6 +46,10 @@ from app.data_engine.validation import validate_events
 from app.database import AsyncSessionLocal
 from app.models import League, Match, MatchStatus, Team
 from app.schemas import InjuredPlayerInfo, TeamFormEntry, H2HResult
+
+# ── ELO constants (mirror train_xgboost.py EloTracker) ───────────────────────
+_ELO_K        = 20.0
+_ELO_HOME_ADV = 40.0
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +139,79 @@ async def _upsert_team(session: AsyncSession, norm: NormalizedTeam, league: Leag
     return team
 
 
+async def _update_elo_and_stats(
+    session: AsyncSession,
+    home_team: Team,
+    away_team: Team,
+    home_score: int,
+    away_score: int,
+) -> None:
+    """
+    Update ELO ratings and rolling attack/defense stats for both teams
+    after a match result is confirmed.
+
+    ELO formula matches train_xgboost.py EloTracker exactly so inference
+    and training stay in sync.
+    """
+    # ── ELO update ─────────────────────────────────────────────────────────
+    ra, rb = home_team.elo_rating, away_team.elo_rating
+    adj_ra = ra + _ELO_HOME_ADV
+    ea = 1.0 / (1.0 + 10.0 ** ((rb - adj_ra) / 400.0))
+    gd = abs(home_score - away_score)
+    k_mult = 1.0 if gd <= 1 else (1.1 if gd == 2 else min(1.1 + 0.05 * (gd - 2), 1.3))
+    k = _ELO_K * k_mult
+    sa = 1.0 if home_score > away_score else (0.5 if home_score == away_score else 0.0)
+    home_team.elo_rating = round(ra + k * (sa - ea), 1)
+    away_team.elo_rating = round(rb + k * ((1.0 - sa) - (1.0 - ea)), 1)
+    logger.debug(
+        "ELO update: %s %.0f→%.0f  %s %.0f→%.0f",
+        home_team.name, ra, home_team.elo_rating,
+        away_team.name, rb, away_team.elo_rating,
+    )
+
+    # ── Rolling attack / defense (last 10 finished) ────────────────────────
+    for team in (home_team, away_team):
+        # Fetch last 10 finished results involving this team
+        q = (
+            select(Match.home_team_id, Match.away_team_id, Match.home_score, Match.away_score)
+            .where(
+                Match.status == MatchStatus.FINISHED,
+                Match.home_score.isnot(None),
+                Match.away_score.isnot(None),
+                or_(Match.home_team_id == team.id, Match.away_team_id == team.id),
+            )
+            .order_by(Match.match_date.desc())
+            .limit(10)
+        )
+        rows = (await session.execute(q)).all()
+
+        # Also include the current match result (not yet committed)
+        current_gf = home_score if team.id == home_team.id else away_score
+        current_ga = away_score if team.id == home_team.id else home_score
+        goals_for = [current_gf]
+        goals_against = [current_ga]
+
+        for htid, atid, hs, as_ in rows:
+            if htid == team.id:
+                goals_for.append(hs)
+                goals_against.append(as_)
+            else:
+                goals_for.append(as_)
+                goals_against.append(hs)
+
+        n = len(goals_for)
+        if n >= 3:  # need at least 3 results to be meaningful
+            avg_gf = sum(goals_for) / n
+            avg_ga = sum(goals_against) / n
+            # Normalise to league average of 1.0 (average team scores ~1.3 goals/game)
+            team.attack_strength  = round(avg_gf / 1.3, 3)
+            team.defense_weakness = round(avg_ga / 1.3, 3)
+            logger.debug(
+                "Rolling stats %s: atk=%.2f def=%.2f (n=%d)",
+                team.name, team.attack_strength, team.defense_weakness, n,
+            )
+
+
 async def _upsert_match(
     session: AsyncSession,
     norm: NormalizedMatch,
@@ -162,6 +240,14 @@ async def _upsert_match(
         session.add(match)
         created = True
     else:
+        # Detect when a match newly becomes FINISHED to trigger ELO + stats update
+        just_finished = (
+            match.status != MatchStatus.FINISHED
+            and norm.status == MatchStatus.FINISHED
+            and norm.home_score is not None
+            and norm.away_score is not None
+        )
+
         # Always update mutable fields
         match.status = norm.status
         match.home_score = norm.home_score
@@ -172,6 +258,12 @@ async def _upsert_match(
             match.venue = norm.venue
         if norm.referee and not match.referee:
             match.referee = norm.referee
+
+        if just_finished:
+            await _update_elo_and_stats(
+                session, home_team, away_team,
+                norm.home_score, norm.away_score,
+            )
 
     return match, created
 
@@ -497,8 +589,6 @@ async def get_h2h(
 
 async def get_schedule_congestion(team_external_id: str, db: AsyncSession) -> float:
     """Returns days since team's last finished match. Returns 7.0 if no history."""
-    from sqlalchemy import or_
-
     team_result = await db.execute(select(Team).where(Team.external_id == team_external_id))
     team = team_result.scalar_one_or_none()
     if not team:
